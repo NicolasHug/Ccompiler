@@ -14,8 +14,8 @@ Erreurs gerees :
   Appel de fonctions avec mauvais nombre d'arguments
   Appel de fonctions avec mauvais type d'arguments
   retour de fonction inexistant ou inapproprié
- 
- 
+
+
 erreurs non gerees parce que trop chaud :
   *(EXPR) : on sait pas si EXPR est vraiment un pointeur ou pas
   Si on fait int a; int * b = &a; *b = 4; a est toujours considérée comme non init
