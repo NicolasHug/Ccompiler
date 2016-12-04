@@ -18,16 +18,17 @@ void afficherTable() {
   int i = 0;
   printf("---------\nTable des symboles : \n");
   for (i= 0; i<indiceCourant ; i++) {
-    printf("%d : %s %d %d\n", i, table[i].nom, table[i].type, table[i].estUnArg);
+    printf("%d : %s %d %d\n", i, table[i].nom, table[i].type,
+           table[i].estUnArg);
   }
   printf("---------\n");
 }
 
 
-// cleanTable() doit être appelée à chaque fois que des variables temporelles sont créés, 
-// mais seulement après qu'elles ont toutes été utilisées
-// ex : après une affectation, après un if (pour les variables temporelles d'évaluation de la cond)
-// après un while (idem)...
+// cleanTable() doit être appelée à chaque fois que des variables temporelles
+// sont créés, mais seulement après qu'elles ont toutes été utilisées
+// ex : après une affectation, après un if (pour les variables temporelles
+// d'évaluation de la cond) après un while (idem)...
 void cleanTable() {
   while (indiceCourant > 0 && table[indiceCourant - 1].type == TEMP) {
     indiceCourant--;

@@ -36,7 +36,8 @@ unSymbole * getSymbole(char * nom);
 // set le symbole à "initialisé"
 void setInitialise (char * nom);
 
-// Efface les dernières variables temporaires de la table en modifiant indiceCourant
+// Efface les dernières variables temporaires de la table en modifiant
+// indiceCourant
 void cleanTable();
 
 // Efface toutes les entrees de la table

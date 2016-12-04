@@ -30,7 +30,8 @@ struct jumpFor {
 typedef struct jumpFor jumpFor;
 
 extern int cmptInst; // Nombre courant d'instructions écrites
-extern unJump jumps[NOMBRE_MAX_JUMPS]; // Tableau des sauts rempli au fur et à mesure du parsing
+// Tableau des sauts rempli au fur et à mesure du parsing
+extern unJump jumps[NOMBRE_MAX_JUMPS];
 extern int nbJumps; // indice courant dans jumps
 
 // Initialisation du compilateur

@@ -3,7 +3,8 @@
 
 /* 
  * Fichier exprArithmetiques.h
- * Contient les fonctions appelées lorsque yacc rencontre une expression arithmetique
+ * Contient les fonctions appelées lorsque yacc rencontre une expression
+ * arithmetique
  */
 
 int exprEntier (int entier);

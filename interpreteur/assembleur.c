@@ -40,7 +40,8 @@ void ajouterIns (void (* pf_ins) (int, int, int), ...) {
   va_end(ap);
 }
 
-// On effectue les instructions contenues dans la rom tant qu'on n'est pas à la fin...
+// On effectue les instructions contenues dans la rom tant qu'on n'est pas à la
+// fin...
 void execute () {
   while (pc < nbInstructions) {
     rom[pc].ins(rom[pc].arg1, rom[pc].arg2, rom[pc].arg3);
@@ -230,7 +231,8 @@ void asm_or (int adrRes, int adrOp1, int adrOp2) {
 }
 
 void asm_call (int adr, int blop1, int osef2) {
-  ram[esp++] = pc ; // push pc ( pas pc + 1 car l'incrémentation sera faite par execute)
+  // push pc ( pas pc + 1 car l'incrémentation sera faite par execute)
+  ram[esp++] = pc ;
   pc = adr; 
   pc--; // Pour éviter le pc++ de execute
   if (debug) {
@@ -239,7 +241,8 @@ void asm_call (int adr, int blop1, int osef2) {
   }
 }
 
-// On décrémente esp du nombre d'arguments pushés après avoir remis PC à sa bonne valeur
+// On décrémente esp du nombre d'arguments pushés après avoir remis PC à sa
+// bonne valeur
 void asm_ret (int decrementESP, int blop2, int osef3) {
   pc = ram[--esp];
   esp -= decrementESP; 

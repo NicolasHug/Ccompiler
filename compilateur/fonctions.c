@@ -15,11 +15,12 @@ extern int erreurExiste;
 uneFonction fonctions[NOMBRE_MAX_FONCTIONS];
 int nbFonctions;
 
-// La fonction couramment appellee (manipulee dans les fonctions d'appel pour la gestion des types d'arguments)
-uneFonction * fonctionAppellee; 
+// La fonction couramment appelee (manipulee dans les fonctions d'appel pour la
+// gestion des types d'arguments)
+uneFonction * fonctionAppellee;
 
 void debutFonction(char * nom, int doitRetourner) {
-  
+
   viderTableSymboles();
 
   if (strcmp(nom,"main") == 0) {
@@ -87,8 +88,9 @@ uneFonction * getFonction (char * nom) {
   return f;
 }
 
-// Demande l'incrémentation d'esp du nombre de variables déclarés dans la fonction appellante
-void debutAppel(char * nom) { 
+// Demande l'incrémentation d'esp du nombre de variables déclarées dans la
+// fonction appellante
+void debutAppel(char * nom) {
   fonctionAppellee = getFonction(nom);
   if (fonctionAppellee != NULL) {
     FILE * fd = ouvrirFichier(0);
@@ -111,7 +113,8 @@ void appel(char * nom, int nbArgsPushes) {
     erreurExiste = 1;
   }
   if (fonctionAppellee != NULL) {
-    fonctionAppellee->nbArgsPushes = 0; // On reinitialise pour les prochains appels
+    // On reinitialise pour les prochains appels
+    fonctionAppellee->nbArgsPushes = 0;
   }
   FILE * fd = ouvrirFichier(0);
   fprintf(fd,"cal %d\n", getAdresseFonction(nom));
@@ -146,7 +149,8 @@ void afficherTableFonctions() {
   printf("---------\nTable des fonctions\n");
 
   for (i = 0; i<nbFonctions;i++) {
-    printf("%s %d %d %d\n",fonctions[i].nom, fonctions[i].ligneDeb, fonctions[i].doitRetourner, fonctions[i].aRetourne);
+    printf("%s %d %d %d\n",fonctions[i].nom, fonctions[i].ligneDeb,
+           fonctions[i].doitRetourner, fonctions[i].aRetourne);
   }
 }
 
@@ -172,7 +176,8 @@ void finFonction() {
     cmptInst += 3;
   }
 
-  cleanTable(); // Il faut cleaner pour la variable temporaire squattée par le ert
+  // Il faut cleaner pour la variable temporaire squattée par le ert
+  cleanTable();
   afficherTable();
 }
 
@@ -188,10 +193,12 @@ void retour(int adr) {
     cmptInst += 4;
   }
   fonctionCourante->aRetourne = 1;
-  cleanTable(); // Il faut cleaner pour la variable temporaire squattée par le ert
+  // Il faut cleaner pour la variable temporaire squattée par le ert
+  cleanTable();
 }
 
-// Permet de connaitre le nombre d'args d'une fonction, leurs types et leurs noms
+// Permet de connaitre le nombre d'args d'une fonction, leurs types et leurs
+// noms
 void definirArg(int type, char * nom) {
   uneFonction *fCourante = &fonctions[nbFonctions-1];
   unArg newArg;

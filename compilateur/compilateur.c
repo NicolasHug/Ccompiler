@@ -12,10 +12,13 @@ int cmptInst ;
 
 unJump jumps[NOMBRE_MAX_JUMPS];
 int nbJumps;
-int pileJumps [TAILLE_MAX_PILE_JUMPS]; // Contient les indices des sauts dans le tableau jumps (pour while if et for)
+// pileJumps contient les indices des sauts dans le tableau jumps (pour while
+// if et for)
+int pileJumps [TAILLE_MAX_PILE_JUMPS];
 int spJumps; // Pointeur sur PileJumps
 
-jumpFor fors[NOMBRE_MAX_FOR]; // Tableau des boucles for rempli au fur et à mesure
+// Tableau des boucles for rempli au fur et à mesure
+jumpFor fors[NOMBRE_MAX_FOR];
 int nbFors; // nombre courant de for écrits
 
 
@@ -62,10 +65,12 @@ void finIf() {
   int indiceJMP = nbJumps++;
   int indiceJMF = popPileJumps();
   jumps[indiceJMP].ligneIns = cmptInst;
-  // Par défaut s'il n'y a pas de else, on jmp juste a la ligne suivante (pas d'effet)
+  // Par défaut s'il n'y a pas de else, on jmp juste a la ligne suivante (pas
+  // d'effet)
   jumps[indiceJMP].ligneSaut = cmptInst + 1;
-  // On ajoute un JMP dans la pileJumps mais on ne le prend pas en compte par défaut s'il n'y a pas de else (spJumps --)
-  // Pour ne pas encombrer la pileJumps
+  // On ajoute un JMP dans la pileJumps mais on ne le prend pas en compte par
+  // défaut s'il n'y a pas de else (spJumps --) Pour ne pas encombrer la
+  // pileJumps
   pushPileJump(indiceJMP);
   spJumps --;
   // +1 car il faut éviter le JMP
