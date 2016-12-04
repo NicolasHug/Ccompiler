@@ -1,0 +1,1074 @@
+%% LyX 2.0.2 created this file.  For more info, see http://www.lyx.org/.
+%% Do not edit unless you really know what you are doing.
+\documentclass[french]{article}
+\usepackage[T1]{fontenc}
+\usepackage[latin9]{inputenc}
+\usepackage{listings}
+\usepackage{geometry}
+\geometry{verbose,lmargin=2cm,rmargin=2cm}
+\usepackage{amsthm}
+\usepackage{amsmath}
+
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% LyX specific LaTeX commands.
+%% Because html converters don't know tabularnewline
+\providecommand{\tabularnewline}{\\}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Textclass specific LaTeX commands.
+\numberwithin{equation}{section}
+\numberwithin{figure}{section}
+
+\makeatother
+
+\usepackage{babel}
+\addto\extrasfrench{%
+   \providecommand{\og}{\leavevmode\flqq~}%
+   \providecommand{\fg}{\ifdim\lastskip>\z@\unskip\fi~\frqq}%
+}
+
+\begin{document}
+
+\title{Projet de système informatique}
+
+
+\author{Nicolas Hug, Maël Zoungrana}
+
+\maketitle
+\pagebreak{}
+
+\tableofcontents{}
+
+\pagebreak{}
+
+
+\part*{Introduction}
+
+Dans le cadre du projet Système Informatique, nous avons conçu un
+compilateur de langage C simplifié, un interpréteur de code assembleur,
+ainsi qu'un processeur basique en VHDL.
+
+Le compilateur que nous avons mis au point permet de prendre en compte
+divers aspects du langage C. Nous avons utilisé les logiciels Lex
+et Yacc pour l'analyse lexicale et le parsage du fichier source C.
+Lex effectue une analyse lexicale sur le fichier source, et Yacc utilise
+Lex pour en faire une analyse syntaxique. Nous avons décrit la grammaire
+de notre langage C dans le fichier yacc, et effectué une série d'actions
+en fonction du types des symboles (terminaux ou non) que Yacc pouvait
+rencontrer. La plupart du temps, ces actions écrivent une instruction
+assembleur dans le fichier assembleur de sortie. 
+
+Le fichier assembleur de sortie sera lu et interprété par l'interpreteur,
+qui manipule une ROM où se trouvent les insctructions du programme,
+une RAM où se trouvent les données manipulées, ainsi que plusieurs
+registres.
+
+Le processeur BALBLABALBALBLABLA MAEL GO FOR IT
+
+La première partie de ce rapport sera consacrée au compilateur et
+à l'interpréteur, et la seconde détaillera l'implémentation du processeur
+sur carte FPGA.
+
+\pagebreak{}
+
+
+\part{Le compilateur et l'interpréteur}
+
+Nous détaillerons dans cette partie les possibilités de notre compilateur,
+ainsi que les moyens que nous avons utilisés pour les implémenter.
+La première section traitera de la table des symboles : son utilité,
+sont utilisation. Les trois sections suivantes détaillerons la mise
+en place de la compilation des structures de contrôles et boucles,
+des pointeurs, puis des fonctions. La dernière section expliquera
+le processus de gestion des erreurs lors de la compilation. L'interpréteur
+sera rapidement évoqué au travers des différentes sections mais nous
+n'approfondirons pas son implémentation car son fonctionnement n'est
+ni très compliqué, ni très intéressant.
+
+
+\section{La table des symboles et les variables}
+
+
+\subsection{Table des symboles}
+
+La table des symboles est une représentation interne au compilateur
+qui permet de connaître, à un endroit donné dans le code source C,
+les variables actuellement connues, ainsi que les arguments passés
+à une fonction (un symbole est équivalent à une variable, ou à un
+argument). Ces variables peuvent être déclarées ou non, initialisées
+ou non, temporaires ou non... Nous avons choisi la structure suivante
+pour représenter un symbole :
+
+\begin{lstlisting}
+struct unSymbole {
+  char * nom;   
+  int type;
+  intr estInit;
+  int estUnArg;
+}; 
+\end{lstlisting}
+
+
+Le champ type peut prendre les valeurs INT (int), PT (pointeur sur
+int), CONST (const int), ou TEMP (variable temporaire). Le champ estInit
+indique si la variable est initialisée, et est utilisé pour gérer
+les erreurs. Le champ estUnArg permet de savoir si la variable est
+un argument passé en à la fonction en cours d'éxecution.
+
+Lorsque Yacc rencontre une règle qui correspond à une déclaration
+d'entier, de constante ou de pointeur, on demande la création d'un
+symbole avec les types et noms associés dans la table des symboles.
+Par exemple, si Yacc rencontre
+
+\begin{lstlisting}
+int a;
+int * b = &a;
+\end{lstlisting}
+
+
+On insère le symbole a :
+
+\begin{lstlisting}
+nom = "a"
+type = INT;
+estInit = 0;
+estUnArg = 0;
+\end{lstlisting}
+
+
+Puis le symbole b :
+
+\begin{lstlisting}
+nom = "b";
+type = PT;
+estInit = 1;
+estUnArg = 0;
+\end{lstlisting}
+
+
+Nous avons choisi d'établir que l'indice d'une variable dans la table
+des symboles correspond à son adresse dans la RAM%
+\footnote{En réalité ce n'est plus tout à fait vrai depuis la gestion des fonctions
+avec arguments. Plus de détails partie 4.%
+}. Ainsi, lorsque Yacc rencontre une règle où la variable var est utilisée,
+on va pouvoir connaître facilement son adresse dans la RAM et écrire
+les instructions assembleur manipulant cette adresse de façon à réaliser
+l'action souhaitée.
+
+
+\subsection{Expressions arithmétiques, variables temporaires}
+
+Nous utilisons des variables temporaires pour évaluer les expressions
+arithmétiques. Les expressions arithmetiques sont utilisées sur de
+nombreuses règles, comme la règle suivante qui permet d'affecter une
+valeur à une variable :
+
+\begin{lstlisting}
+Affectation : tNom tEgal Expr_Arithmetique;
+\end{lstlisting}
+Elles permettent aussi dévaluer une condition, dans une structure
+de contrôle :
+
+\begin{lstlisting}
+Structure_If : tIf tPrt_Ouv Expr_Arithmetique tPrt_Ferm tAcc_Ouv Instructions tAcc_Ferm;
+\end{lstlisting}
+
+
+L'évaluation d'une expression arithmétique par Yacc renvoie toujours
+une adresse (une adresse dans la RAM). Cette adresse est celle d'une
+variable temporaire contenant la valeur de l'expression, et elle peut
+ensuite être utilisée dans les règles utilisant les expressions arithmétiques. 
+
+Détaillons l'évaluation par Yacc de la ligne de code suivante :
+
+\begin{lstlisting}
+a = b;
+\end{lstlisting}
+
+
+Yacc constate que la règle à appliquer à cette ligne est celle vue
+plus haut, à laquelle est en fait associée une action : 
+
+\begin{lstlisting}
+Affectation : tNom tEgal Expr_Arithmetique {actionAffectation($1,$3);} ;
+\end{lstlisting}
+
+
+Le symbole \textsl{Expr\_Arithmetique }est évalué selon la règle suivante
+:
+
+\begin{lstlisting}
+Expr_Arithmetique : tNom {$$ = actionExprNom($1);} ; 
+\end{lstlisting}
+
+
+L'action \textsl{actionExprNom} est de créer une variable temporaire,
+dans laquelle sera copiée la valeur de la variable représentée par
+\textsl{tNom} (donc dans notre cas b), et de renvoyer son adresse\textsl{.
+}C'est la première action réalisée. La suivante est \textsl{actionAffectation},
+et son rôle est de copier la valeur située dans la variable temporaire
+(c'est à dire la valeur de l'expression arithmétique évaluée, donc
+la valeur de b) dans la variable représentée par \textsl{tNom} (donc
+dans notre cas a). 
+
+En supposant que a se trouve à l'adresse 0 dans la table des symboles,
+que b se trouve à l'adresse 1, et que leurs valeurs respectives sont
+2 et 3, voici l'évolution de la table des symboles au cours de l'évaluation
+par Yacc de l'affectation, et l'évolution de la RAM au cours de l'interprétation
+du code assembleur généré :
+
+\begin{tabular}{|c|c|c|c|c|}
+\hline 
+Etat initial & table & a, INT & b,INT & /\tabularnewline
+\cline{2-5} 
+ & ram & 2 & 3 & /\tabularnewline
+\hline 
+Création d'une variable temporaire et copie de la valeur de b & table & a, INT & b,INT & {*}, TEMP\tabularnewline
+\cline{2-5} 
+ & ram & 2 & 3 & 3\tabularnewline
+\hline 
+Copie de la valeur de la variable temporaire dans a & table & a, INT & b,INT & {*}, TEMP\tabularnewline
+\cline{2-5} 
+ & ram & 3 & 3 & 3\tabularnewline
+\hline 
+\end{tabular} 
+
+On constate trois choses :
+\begin{itemize}
+\item La première est que la table des symboles ne se préoccupe en aucun
+cas de la valeur des variables qu'elle contient. La table des symboles
+n'existe que lors de la phase de compilation et ne sert qu'à connaître
+les adresses des variables que l'on souhaite lire ou écrire. 
+\item La seconde est qu'après l'évaluation de l'expression arithmétique,
+une variable temporaire occupe inutilement la table des symboles.
+Il est donc nécessaire de nettoyer la table des symboles après chaque
+règle mettant en jeu des expressions arithmétiques. 
+\item La troisième est que la création de variables temporaires à chaque
+expression arithmétique est loin d'être optimale, que ce soit en terme
+de temps d'exécution ou de mémoire : pour une simple addition entre
+deux variables, on utilise deux variables temporaires (on pourrait
+même en utiliser trois...), et on effectue deux copies. Bien que non
+optimisée, cette solution est relativement simple à implémenter, c'est
+pourquoi nous l'avons conservée.
+\end{itemize}
+
+\section{Structures de contrôle et boucles}
+
+La compilation des structures de contrôle et des boucles génère des
+instructions assembleur de saut et de saut conditionnel. Par exemple,
+pour une simple structure if 
+
+\begin{lstlisting}
+if (condition){
+  /* Code */
+}
+\end{lstlisting}
+
+
+demande l'écriture d'une instruction de saut conditionnel telle que
+la suivante
+
+\begin{lstlisting}
+JMF condition #ligne
+/* Code assembleur correspondant à celui contenu entre les accolades */
+\end{lstlisting}
+
+
+où \#ligne est le numéro de la ligne à laquelle on doit sauter si
+condition n'est pas vraie. \#ligne correspond à la première ligne
+de code assembleur située juste après celui correspondant au code
+contenu entre les accolades du if. Le problème qui se pose, autant
+pour les structures de contrôle que pour les boucles, est que lorsque
+Yacc parse pour la première fois le fichier source, on ne peut pas
+connaître à l'avance \#ligne, tout simplement parce qu'on n'a pas
+encore parsé la suite du fichier, et on n'a donc pas rencontré l'accolade
+fermante. On ne peut par conséquent pas écrire l'instruction de saut
+complète en une seule passe. Par contre, à la fin du parsage, on est
+tout à fait capable de savoir quel saut doit sauter à quelle ligne,
+puisque toutes les accolades fermantes ont été rencontrées. 
+
+La phase de compilation comporte donc deux passes : la première correspond
+au parsage par Yacc, dans laquelle on écrit seulement partielement
+les instructions de saut dont on ne connait encore pas le numéro de
+la ligne à laquelle sauter (typiquement 'JMF cond @' ou 'JMP @'),
+en prenant tout de même soin de garder une correspondance saut - ligne
+à laquelle sauter une fois qu'on est en mesure de connaître les lignes
+auxquelles sauter. La seconde passe consiste à remplacer tous les
+'@' écrits dans le fichier de sortie par le numéro de ligne adéquat,
+ceci étant possible grâce à la correspondance saut - ligne à laquelle
+sauter établie lors de la première passe.
+
+Nous allons détailler comment nous établissons la correspondance nécessaire
+pour les différentes structures et boucles que nous pouvons utiliser
+dans notre langage C dans les sections suivantes.
+
+
+\subsection{Structures if et else}
+
+
+\subsubsection{If simple}
+
+Voici la grammaire correspondant à une structure de contrôle if.
+
+\begin{lstlisting}
+/* STRUCTURE IF */ 
+Structure_If :   tIf tPrt_Ouv Expr_Arithmetique tPrt_Ferm
+		tAcc_Ouv Instructions tAcc_Ferm;
+\end{lstlisting}
+
+
+On utilise deux structures de données : un tableau contenant un couple
+ligne du saut - ligne où sauter qui est rempli au fur et à mesure
+(et qui est lu lors de la seconde passe), et une pile de saut. La
+pile contient en fait les indices des sauts dans le tableau, car il
+est inutile de dupliquer les données. L'utilisation d'une pile permet
+d'imbriquer les if les uns dans les autres.
+
+Lorsque Yacc rencontre un symbole de type Structure\_If, on ajoute
+un saut dans le tableau. Le nouveau saut du tableau est partiellement
+rempli : on ne connait pour l'instant que la ligne à laquelle le saut
+est écrit. Ce saut est un saut conditionnel qui évalue la condition
+représentée par le symbole Expr\_Arithmetique, et on écrit donc dans
+le fichier assembleur la ligne suivante :
+
+\begin{lstlisting}
+JMF X @
+\end{lstlisting}
+
+
+où X est l'adresse où se trouve l'évaluation de l'expression arithmetique.
+Le caractère '@' sera remplacé lors de la seconde passe.
+
+Lorsque Yacc arrive au symbole tAcc\_Ferm, on sait que c'est ici%
+\footnote{ici = nombre de lignes assembleurs déjà écrites + 1%
+} que le saut écrit correspondant doit sauter. Ce saut en question
+est le saut qui est au sommet de la pile : ce n'est pas forcément
+le dernier saut qui a été empilé parce qu'il y a pu avoir des imbrications
+de if, mais comme les précédents ont été dépilés, on est sûr que c'est
+celui du sommet. On dépile donc le saut, en prenant soin mettre à
+jour le champ ``ligne de saut'' dans le tableau des sauts.
+
+
+\subsubsection{If else}
+
+Voici la grammaire correspondant à une structure if - else. On remarque
+que l'utilisation des accolades est obligatoire :
+
+\begin{lstlisting}
+Structure_If : Structure_If Structure_Else;
+
+Structure_Else : tElse tAcc_Ouv Instructions tAcc_Ferm; 
+\end{lstlisting}
+
+
+La compilation d'un bout de programme tel que celui-ci :
+
+\begin{lstlisting}
+if (condition) {
+  /* Code if*/
+} else {
+  /* Code else */
+}
+\end{lstlisting}
+
+
+doit générer l'écriture d'un code assembleur tel que celui-ci :
+
+\begin{lstlisting}
+JMF condition #ligne1
+/* Code assembleur correspondant à celui contenu entre les accolades du if */
+JMP #ligne2
+/* Code assembleur correspondant à celui contenu entre les accolades du else */
+\end{lstlisting}
+
+
+\#ligne1 serait le numéro de la ligne juste en dessous de JMP \#ligne2,
+et \#ligne2 serait le numéro de la ligne située à la fin du code assembleur
+contenu entre les accolades du else. On constate que rien ne change
+par rapport à la compilation d'un if simple. Seul l'ajout d'un saut
+inconditionnel diffère du méchanisme précédent. En réalité, à la fin
+d'une structure if, on écrit un 'JMP @', même s'il n'y a pas de else
+derrière. Par défaut, @ prend la valeur du numéro de la ligne suivante.
+Donc s'il n'y a pas de else, on saute à la ligne suivante, c'est à
+dire qu'on ne fait rien du tout. Par contre, s'il y a bien un else,
+on prend en compte ce saut et on remplace '@' par la valeur adéquate.
+
+
+\subsection{Boucles while}
+
+Voici la grammaire d'une boucle while :
+
+\begin{lstlisting}
+/* BOUCLE WHILE */ 
+Boucle_While : tWhile tPrt_Ouv Expr_Arithmetique tPrt_Ferm tAcc_Ouv  Instructions tAcc_Ferm;
+\end{lstlisting}
+
+
+Les structures de données utilisées sont exactement les mêmes que
+pour la compilation des structures de contrôle if else : un tableau
+contenant un couple ligne du saut - ligne où sauter, et une pile de
+saut. Le bout de programme suivant :
+
+\begin{lstlisting}
+while (condition) {
+  /* Code */
+}
+\end{lstlisting}
+
+
+doit générer l'écriture d'un code assembleur tel que celui\_ci :
+
+\begin{lstlisting}
+JMF condition #ligne1
+	/* Code assembleur correspondant à celui contenu entre les accolades */
+JMP #ligne2
+\end{lstlisting}
+
+
+où \#ligne1 correspond au numéro de la ligne juste en dessous de celle
+où est écrit le JMP, et où \#ligne2 correspond à une ligne située
+au dessus du JMF. En fait, le JMP doit renvoyer au dessus du JMF :
+il doit renvoyer à la ligne où commence l'évaluation de la condition.
+En effet, il faut réévaluer la condition à chaque fin de boucle, sinon
+le programme partirait en boucle infinie. La compilation d'une boucle
+while est très similaire à celle d'une structure if, la différence
+majeure résidant dans le besoin de réévaluation de l'expression arithmétique.
+
+
+\subsection{Boucles for}
+
+Voici la grammaire d'une boucle for :
+
+\begin{lstlisting}
+Boucle_For : tFor tPrt_Ouv Affectation tPt_Virgule {condFor();}
+	Expr_Arithmetique {fprintf_jmf($6); fprintf_jmp(); debutFor();} tPt_Virgule
+	Affectation {fprintf_jmp(); milieuFor();} tPrt_Ferm
+	tAcc_Ouv Instructions {finFor(); fprintf_jmp();} tAcc_Ferm ;
+\end{lstlisting}
+
+
+Nous avons considéré que dans les parenthèses on ne peut faire qu'une
+affectation car c'est comme cela que l'on utilise les boucle for la
+plupart du temps.
+
+La compilation de ce code :
+
+\begin{lstlisting}
+for (pré-affectation; condition; post-affectation) {
+  /* Code */
+}
+\end{lstlisting}
+
+
+Doit donner ce code assembleur :
+
+\begin{lstlisting}
+AFC @résultat valeur /* pré-affection */
+/* Code correspondant à l'évaluation de condition */
+JMF condition #ligne1
+	/* Code assembleur correspondant à celui contenu entre les accolades */
+AFC @résultat valeur /* post-affectation */
+JMP #ligne2
+\end{lstlisting}
+
+
+Avec \#ligne1 la ligne en dessous du deuxième JMP et \#ligne2 la ligne
+du début de l'évaluation de la condition. (On ne refait pas la pré-affectation)
+
+Cependant pour obtenir ce résultat il faut changer l'ordre des différentes
+parties du for, nous avons donc choisi une façon plus simple de le
+faire mais utilisant plus d'instructions de saut :
+
+\begin{lstlisting}
+AFC @résultat valeur /* pré-affection */
+/* Code correspondant à l'évaluation de condition */
+JMF condition #ligne1
+JMP #ligne2
+AFC @résultat valeur /* post-affectation */
+JMP #ligne3
+	/* Code assembleur correspondant à celui contenu entre les accolades */
+JMP #ligne4
+\end{lstlisting}
+
+
+On a alors \#ligne1 la ligne en dessous du dernier JMP, \#ligne2 la
+ligne du début des instructions qui étaient entre les accolades (en
+dessous du deuxième JMP), \#ligne3 la ligne de la post-affectation
+et \#ligne4 la ligne du début de l'évaluation de la condition.
+
+On utilise les mêmes structures que précédemment pour mémoriser les
+lignes où sont placées les instructions de saut et celles auxquelles
+elles renvoient, mais comme il y a plusieurs sauts reliés entre eux
+de différentes façons nous utilisons en plus une structure spécifique
+aux boucles for. Au fur et à mesure de l'avancée du compilateur dans
+la boucle for on va remplir cette structure, et lorsqu'on sera à la
+fin on établira toutes les correspondances ligne - saut nécessaires
+au bon déroulement de la deuxième passe.
+
+
+\section{Pointeurs et tableaux}
+
+Les programmes compilés par notre compilateur peuvent contenir des
+pointeurs. Nous avons implémenté les pointeurs sur des entiers uniquement
+(on ne peux pas faire de pointeur de pointeur). En C, les pointeurs
+et les tableaux sont deux types de données très proches (un tableau
+est un pointeur constant). Dans notre langage, nous ne différençons
+pas les pointeurs et les tableaux. Ils peuvent s'utiliser aussi bien
+avec les opérateur '{*}' que {[}{]}. L'implémentation des pointeurs/tableaux
+n'est pas une chose très compliquée. Nous avons eu besoin de trois
+nouveaux opérateurs :
+
+\begin{lstlisting}
+/* Operateur * (pointeur) */
+Expr_Arithmetique : tFois Expr_Arithmetique
+/* Operateur & */ 
+Expr_Arithmetique : tEt tNom
+/* Operateur [] */ Expr_Arithmetique : tNom tCroch_Ouv Expr_Arithmetique tCroch_Ferm;
+\end{lstlisting}
+
+
+ainsi que de deux nouveaux types de déclaration :
+
+\begin{lstlisting}
+/* Declaration pointeur */ 
+Declarations : tInt tFois tNom tPt_Virgule; 
+/* Declaration tableau */ 
+Declarations : tInt tNom tCroch_Ouv tEntier tCroch_Ferm tPt_Virgule;
+\end{lstlisting}
+
+
+et de deux nouveaux types d'affectation :
+
+\begin{lstlisting}
+/* Affectation indirecte (opérateur *) */ 
+Affectation : tFois Expr_Arithmetique tEgal Expr_Arithmetique;
+/* Affectation indirecte (opérateur []) */ 
+Affectation : tNom tCroch_Ouv Expr_Arithmetique tCroch_Ferm tEgal Expr_Arithmetique;
+\end{lstlisting}
+
+
+Côté assembleur, il nous a fallut ajouter deux nouvelles instructions
+qui correspondent à des copies indirectes : 
+
+\begin{lstlisting}
+CPI adr1 adr2 <=> ram[adr1] = ram[ram[adr1]];
+et
+ICP adr1 adr2 <=> ram[ram[adr1]] = ram[adr1];
+\end{lstlisting}
+
+
+La déclaration d'un pointeur alloue simplement un case en mémoire,
+au même titre que la déclaration d'un entier. La déclaration d'un
+tableau alloue une case mémoire pour un pointeur, puis autant de cases
+qu'il y a d'éléments dans le tableau. Le pointeur alloué précédemment
+pointe sur la première case du tableau (soit la case suivante).
+
+La compilation du code suivant : 
+\begin{lstlisting}
+int * a;
+int b = 0;
+a = &b;
+*a = 3;
+\end{lstlisting}
+
+
+générera le code assembleur suivant (on omettra quelques variables
+temporaires par soucis de simplicité) :
+
+\begin{lstlisting}
+afc 1 0 /* affectation de 0 à b situé à la case 1 (a est à la case 0) */
+afc 2 1 /* variable temporaire en case 2 contenant l'adresse de b : c'est l'évaluation de l'expression arithmétique */
+cop 0 2 /* a vaut l'adresse de b */
+afc 2 3 /* variable temporaire en case 2 contenant la valeur 3 */
+icp 0 2 /* la variable pointée par a vaut la valeur contenue à la case 2 : b vaut maintenant 3 */
+\end{lstlisting}
+
+
+Inversement, la compilation du code suivant :
+
+\begin{lstlisting}
+int * a;
+int b = 3;
+int c = 0;
+a = &b;
+c = *a;
+\end{lstlisting}
+
+
+générera le code assembleur suivant (ici aussi on omettra quelques
+variables temporaires par soucis de simplicité) :
+
+\begin{lstlisting}
+afc 1 3 /* affectation de 3 à b situé à la case 1 (a est à la case 0 et c à la case 2) */
+afc 2 0 /* affectation de 0 à c */
+afc 3 1 /* variable temporaire en case 2 contenant l'adresse de b : c'est l'évaluation de l'expression arithmétique */
+cop 0 3 /* a vaut l'adresse de b */
+cop 3 0 /* variable temporaire contenant l'adresse de a */
+cpi 2 3 /* c vaut la valeur de la variable pointée par a, soit 3 */
+\end{lstlisting}
+
+
+La compilation de l'utilisation des tableaux est très similaire. Pour
+accéder à la nième case d'un tableau, il suffit d'ajouter n :
+\begin{itemize}
+\item soit en tant qu'offset au icp (dans le cas d'une affectation)
+\item soit à la variable temporaire contenant l'adresse de la variable pointée
+dont la valeur doit être copiée (dans le cas d'un cpi, donc une lecture).
+\end{itemize}
+
+\section{Les fonctions}
+
+
+\subsection{Fonctions récursives basiques}
+
+Pour pouvoir compiler des programmes mettant en jeu des fonctions
+récursives basiques (sans retour et sans arguments), il nous a fallu
+modifier la structure de notre langage C. Auparavant, la grammaire
+d'un programme C était celle-ci :
+
+\begin{lstlisting}
+ProgrammeC : tInt tMain tPrt_Ouv tPrt_Ferm tAcc_Ouv Corps tAcc_Ferm;
+\end{lstlisting}
+
+
+Pour pouvoir prendre en compte les fonctions autres que le main, nous
+l'avons changé de cette façon :
+
+\begin{lstlisting}
+ProgrammeC : Fonctions; /* Un programme C est une fonction unique, ou une suite de fonctions */
+Fonctions : Fonction Fonctions;
+Fonctions : Fonction;
+Fonction : Type tNom tPrt_Ouv Arguments tPrt_Ferm tAcc_Ouv Corps tAcc_Ferm; 
+\end{lstlisting}
+
+
+Les symboles Type et Arguments ne sont pas pris en compte pour l'instant.
+Pour gérer des fonctions récursives, un moyen simple est de considérer
+la RAM comme une pile, et donc d'introduire deux nouveaux registres
+:
+\begin{itemize}
+\item ebp : pointeur de base de la pile. La valeur de ebp est constante
+pendant l'exécution d'une fonction
+\item esp : pointeur du haut de la pile. La valeur de esp évolue pendant
+l'éxécution d'une fonction : esp pointe sur la première case mémoire
+libre.
+\end{itemize}
+Un appel de fonction en C n'est rien d'autre qu'un bout de code assembleur
+à exécuter avant de revenir au cours d'exécution normal du programme.
+Lors d'un appel, on sauvegarde le contexte d'exécution de la fonction
+appelante, puis on saute à l'endroit où se trouve le code de la fonction
+appelée. Une fois la fonction exécutée, on n'a plus qu'à réstaurer
+le contexte de la fonction appelante pour continuer l'exécution du
+programme. Comme la sauvegarde et la restauration de contexte se font
+à l'aide d'une pile, les fonctions peuvent être récursives.
+
+Pour sauvegarder le contexte d'une fonction, il suffit de :
+\begin{itemize}
+\item sauvegarder l'adresse de retour de la fonction appelante (pusher le
+registre pc%
+\footnote{En fait il faut pusher pc + 1 pour revenir à la ligne suivante et
+ne pas effectuer la même fonction en boucle%
+})
+\item sauvegarder la base actuelle de la pile (pusher le registre ebp)
+\item créer un nouveau contexte pour la fonction appelée (ebp = esp;).
+\end{itemize}
+Après la sauvegarde du contexte, on saute tout simplement à l'endroit
+où débute le code de la fonction appelée (pc = \#ligne), et on l'exécute.
+A la fin de cette fonction, on fait les opérations inverses pour réstaurer
+le contexte de la fonction appelante :
+\begin{itemize}
+\item détruire le contexte de la fonction appelée en restaurant esp à sa
+valeur précédente (esp = ebp;)
+\item restaurer ebp à sa valeur précédente (poper le registre ebp)
+\item restaurer pc à sa valeur précédente (poper le registre pc)
+\end{itemize}
+Evidemment, l'utilisation des registres ebp et esp implique d'une
+part de n'accéder à la RAM que de manière \textbf{relative }à ebp
+(et non plus de manière absolue par rapport à la case 0), et d'autre
+part de vider la table des symboles à chaque fois que l'on rentre
+dans une fonction lors de la compilation. C'est grâce à cela que l'on
+peut se permettre, entre autres, d'avoir deux variables avec le même
+noms dans deux fonctions différentes.
+
+
+\subsection{Gestion des arguments}
+
+Nous avons amélioré la compilation des fonctions en permettant le
+passage de paramètres. Une fonction peut prendre des paramètres de
+type int, const int, ou int {*}. Par contre, lors de l'appel de la
+fonction, on ne peut passer que des variables en argument :
+
+\begin{lstlisting}
+void f(int a, int * b) {
+  /* code */
+}
+
+int main() {
+  int a = 0;
+  int b = &a;
+
+  f(a,b);  	/* Appel autorisé */
+  f(a,&a);	/* Appel interdit */
+  f(0,b);  	/* Appel interdit */
+  f(a + 4,b);     /* Appel interdit */
+  return 0;
+}
+\end{lstlisting}
+
+
+Lorsque Yacc découvre la déclaration d'une nouvelle fonction, on ajoute
+dans la table des symboles autant de symboles qu'il y a d'arguments.
+Les arguments d'une fonction sont donc les premiers symboles présents
+dans la table des symboles de la fonction. Lors d'un appel de fonction,
+les valeurs des arguments sont pushées dans la RAM, avant même de
+pusher pc. Voici la table des symboles et l'état de la RAM pendant
+l'exécution de cette fonction :
+
+\begin{lstlisting}
+void f(int a, int * b) {
+  int c;
+}
+\end{lstlisting}
+
+
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline 
+Table & 0 & 1 & 2 & 3 & 4 & 5\tabularnewline
+\cline{2-7} 
+ & a & b & c & / & / & /\tabularnewline
+\hline 
+RAM & - 4 & - 3 & - 2 & - 1 & 0 & 1\tabularnewline
+\cline{2-7} 
+ & a & b & pc & ebp & ? & c\tabularnewline
+\hline 
+\end{tabular}
+
+Les adresses dans la RAM sont données relativement à ebp (ebp est
+en 0), conformément à la logique de fonctionnement de l'interpréteur.
+La table des symboles doit donc être capable de renvoyer la valeur
+-4 lorsque l'on recherche l'adresse de a, -3 lorsque l'on recherche
+l'adresse de b, et 1 lorsque l'on recherche l'adresse de c. Plutôt
+que de renvoyer tout simplement l'indice de du symbole dans la table
+des symboles (comme c'était le cas auparavant), notre fonction getAdresse()
+a donc été modifiée :
+
+\begin{lstlisting}
+int getAdresse(unSymbole s) {
+  int adresse;
+  if (s.estUnArg) {
+    adresse =  -(nombreArguments - indice(s)) - 2; /* -2 car il y a ebp et pc pushés */
+  } else {
+    adresse =  -(nombreArguments - indice(s));
+  }
+  return adresse;
+}
+\end{lstlisting}
+
+
+Pour la variable a, getAdresse() renverra -(2 - 0) - 2 soit -4. Pour
+c, on aura -(2 - 2) soit 0, ce qui correspond aux valeurs attendues
+\textbackslash{}o/.
+
+
+\subsection{Gestion de la valeur de retour}
+
+La gestion des retours de fonctions a été assez simple. Nous avons
+créé un nouveau registre (erp), et une nouvelle instruction dans notre
+grammaire :
+
+\begin{lstlisting}
+/* Retour */ 
+Instructions : tReturn Expr_Arithmetique tPt_Virgule; 
+\end{lstlisting}
+
+
+Lorsque l'on rencontre cette instruction, on sauvegarde dans erp la
+valeur contenue à l'adresse renvoyée par l'évaluation du symbole Expr\_Arithmetique.
+Une nouvelle expression arithmétique a elle aussi été crée :
+
+\begin{lstlisting}
+/* Appel de fonction */ 
+Expr_Arithmetique : tNom tPrt_Ouv PassageArguments tPrt_Ferm;
+\end{lstlisting}
+
+
+Cette expression arithmétique correspond à un appel de fonction. Elle
+renvoie l'adresse d'une variable temporaire contenant la valeur de
+erp. On peut donc évaluer des appels de fonctions en tant que condition,
+affecter des variables à la valeur de retour d'une fonction, etc...
+
+
+\section{Gestion des erreurs}
+
+Notre compilateur peut détecter différents types d'erreurs dans le
+programme source C. Si l'on détecte une erreur dans le programme C,
+la seconde passe n'est pas effectuée. Le fichier assembleur n'est
+donc pas changé si le fichier source contient des erreurs.
+
+
+\subsection{Erreurs de syntaxe}
+
+Les erreurs de syntaxe sont détectées par Yacc. Ceci se fait par l'écriture
+de nouvelles règles :
+
+\begin{lstlisting}
+Fonction : error;
+Corps : Declarations  Instructions | error;
+\end{lstlisting}
+
+
+Ceci indique à Yacc qu'il peut survenir des erreurs dans la déclaration
+d'une fonction ou dans son corps. Ceci lui permet de continuer tout
+de même son parsage après avoir rencontré des erreurs. Yacc indique
+automatiquement le caractère de l'erreur rencontrée grâce à l'option
+\%error-verbose.
+
+
+\subsection{Autres types d'erreurs gérés}
+
+De très nombreux types d'erreurs ne peuvent pas être gérés uniquement
+par Yacc. Nous expliquerons brièvement quels sont les autres types
+d'erreurs gérés par notre compilateur, et comment il procède pour
+les détecter :
+
+
+\subsubsection*{Utilisation d'une variable inconnue }
+
+Lorsqu'on utilise une variable, que ce soit pour une affectation ou
+une lecture, on utilise la fonction getAdresse(). Cette fonction sait
+si la variable existe dans la table des symboles et provoque une erreur
+si ce n'est pas le cas.
+
+
+\subsubsection*{Lecture sur variable non initialisée ou non existante}
+
+La lecture d'une variable se fait obligatoirement l'évaluation de
+l'expression arithmétique suivante :
+
+\begin{lstlisting}
+Expr_Arithmetique : tNom;
+\end{lstlisting}
+
+
+Lorsqu'une telle expression arithmétique est rencontrée, on détermine
+si le symbole associé à tNom est bien initialisé.
+
+On peut bien évidemment combiner les deux types d'erreurs précédents
+:
+
+\begin{lstlisting}
+int main () {
+  int a;
+  v = a;
+  return 0;
+}
+\end{lstlisting}
+
+
+On obtiendra les deux erreurs suivantes :
+
+\begin{lstlisting}
+ERREUR : Lecture sur a 0 non initialisee (line 3) 
+ERREUR : Symbole v inconnu (line 3) 
+\end{lstlisting}
+
+
+
+\subsubsection*{Declaration de deux variables/arguments avec le même nom }
+
+Lors de la création d'un symbole, on vérifie qu'il n'en existe pas
+un avec le même nom dans la table des symboles. Ceci veut dire aussi
+qu'on ne peut pas déclarer une variable qui aurait le même nom qu'un
+argument, puisque les arguments sont présents dans la table des symboles
+au même titre que les variables.
+
+
+\subsubsection*{Affectation sur une constante}
+
+Un constante doit être initialisée lors de sa déclaration (c'est une
+règle de la grammaire). Lorsque l'on affecte une variable, on vérifie
+que celle-ci n'est pas une constante à l'aide de la table des symboles.
+Notons qu'il est tout de même possible de modifier la valeur d'une
+constante au cours de l'exécution, de la manière suivante :
+
+\begin{lstlisting}
+int main () {
+  const int a = 0;   
+  int * b = &a;    
+  *b = 2;  
+  return 0; 
+} 
+\end{lstlisting}
+
+
+En effet, on ne déclare que des pointeurs sur int, mais on ne vérifie
+pas qu'ils pointent véritablement sur des int (gcc mettrait un warning
+ici, mais un vulgaire cast le ferait taire).
+
+
+\subsubsection*{Utilisation de l'opérateur {[}{]} sur une variable non pointeur pour
+une affectation}
+
+Lorsque l'opérateur {[}{]}~est utilisé, on vérifie que la variable
+sur laquelle il opère est bien un pointeur à l'aide de la table des
+symboles.
+
+
+\subsubsection*{Appel à une fonction inconnue}
+
+On tient à jour une table des fonctions, qui contient diverses informations
+sur les fonctions déjà parsées. Lorsque Yacc rencontre un appel de
+fonction, on vérifie que cette fonction existe bien dans la table
+des fonctions.
+
+
+\subsubsection*{Appel de fonctions avec mauvais nombre d'arguments}
+
+La table des fonctions permet de savoir combien d'arguments prend
+une fonction. Lors de l'appel à une fonction, on vérifie que le nombre
+d'arguments passés correspond au nombre d'arguments de la fonction.
+Le comptage des arguments passés se fait comme ceci :
+
+\begin{lstlisting}
+/* Appel de fonction (valeur de retour négligée)*/ 
+Appel : tNom {debutAppel($1);} tPrt_Ouv PassageArguments tPrt_Ferm {appel($1,$4);};
+PassageArguments : {$$ = 0;}; 
+PassageArguments : Pargs; 
+Pargs : tNom {pushParam($1);} tVirgule Pargs {$$=$4+1;}; /* Compage du nombre d'arguments */
+Pargs : tNom {pushParam($1); $$=1;}; 
+\end{lstlisting}
+
+
+
+\subsubsection*{Appel de fonctions avec mauvais type d'arguments }
+
+La table des fonctions permet de savoir quel est le type de chaque
+argument. Lorsque l'on push un paramètre, on compare son type avec
+celui attendu.
+
+
+\subsubsection*{Retour de fonction inexistant ou inapproprié }
+
+La table des fonctions permet de savoir si une fonction doit retourner
+(c'est à dire qu'elle ne retourne pas void), et si elle a déjà retournée
+(c'est à dire qu'au moins un return été écrit). A la fin de la fonction,
+on vérifie que si la fonction doit retourner, alors un return a déjà
+été écrit, et que si elle ne doit pas retourner aucun return n'a été
+écrit.
+
+\pagebreak{}
+
+
+\part{Le processeur sur FPGA}
+
+Après avoir réalisé le compilateur et l'interpréteur nous avons créé
+un processeur (avec pipeline 5 étage) en utilisant le langage VHDL,
+capable d'exécuter (la plupart) des instructions générées pas notre
+compilateur. Comme nous avons ajouté plusieurs instructions assembleur
+par rapport au jeu de base, il nous aurait fallut créer un cross assembleur
+pour transformer notre code assembleur orienté mémoire en un code
+assembleur orienté registre pour pouvoir exécuter des programmes compilés
+par notre compilateur.
+
+\setcounter{section}{0} 
+\section{Unité Arithmétique et Logique}
+
+L'Unité Arithmétique et Logique (UAL), prend en entrée des bus de
+8 bits et donne en sortie le résultat d'une opération arithmétique
+de ces entrées. L'opération effectuée est choisie par 3 bits de contrôles.
+Nous avons implémenté l'addition, la soustraction et la multiplication.
+En plus du résultat l'UAL possède des flags pour la retenue de l'addition
+(C), un résultat nul (Z), un résultat négatif (N) et un overflow (V).
+
+L'UAL est asynchrone, on utilise une logique combinatoire pour décider
+des différents flags.
+
+
+\section{Banc de registres}
+
+Le banc de registre permet de manipuler 16 registres de 8 bits. Il
+permet de lire 2 registres en même temps, mais l'écriture ne se fait
+que sur un seul. On a en entrée les adresses des deux registres à
+lire, l'adresse du registre à écrire, la donnée à écrire, le bit écriture
+(actif haut), le bit reset (actif bas) et l'horloge. Les sorties sont
+les valeurs des registres lus.
+
+La lecture des registres est asynchrone mais l'écriture est synchrone.
+
+Pour éviter les aléas de données, nous avons mis en place un bypass
+d -> q : lorsque l'on souhaite lire et écrire sur le même registre,
+on recopie directement l'entrée DATA sur la sortie, on évite ainsi
+d'avoir en sortie l'ancienne valeur du registre.
+
+
+\section{Banc de mémoire}
+
+
+\subsection{Mémoire des données}
+
+Cette mémoire contient 256 emplacements de 8 bits que l'on peut lire
+ou écrire. En entrée on a l'adresse, la valeur à écrire, le bit de
+choix lecture / écriture (1 pour lecture, 0 pour écriture), le reset,
+l'horloge, la seule sortie et la valeur lue.
+
+Cette mémoire et totalement synchrone.
+
+
+\subsection{Mémoire des instructions}
+
+La mémoire des instructions contient 256 instructions sur 32 bits.
+Elle n'est accessible qu'en lecture (comme une ROM) et n'a pas de
+reset. On a donc en entrée l'adresse et l'horloge et en sortie l'instruction.
+
+
+\section{Chemin des données}
+
+Une fois les différents éléments conçus nous les avons assemblés et
+mis en place le pipeline pour créer notre processeur, et lui permettre
+de réaliser les différentes instructions.\\
+Le pipeline est constitué comme ceci :
+
+1er étage : mémoire des instructions
+
+2ème étage : banc de registres (lecture)
+
+3ème étage : unité arithmétique et logique
+
+4ème étage : mémoire des données
+
+5ème étage : banc de registre (écriture)\\
+L'instruction en sortie de la mémoire est un bus de 32 bits, on le
+sépare en 4 bus de 8 bits pour l'envoyer aux différents éléments.
+
+bits 31 à 24 : code opération
+
+bits 23 à 16 : opérande A
+
+bits 15 à 8 : opérande B
+
+bits 7 à 0 : opérande C\\
+Les différentes entrées / sortie possibles sont mises en place par
+des multiplexeurs controlés par le code opération, les bits de choix
+lecture / écriture sont eux le résultat d'une logique combinatoire
+du code opération.
+
+À ce stade notre processeur peut réaliser les instructions AFC, COP,
+ADD, SOU, MUL, LOAD et STORE.
+
+
+\section{Gestion des aléas}
+
+Il existe des cas d'aléas de données dans notre processeur. Ils apparaissent
+lorsque l'on modifie la valeur d'un registre puis que l'on stocke
+cette valeur (dans un registre ou dans la mémoire des données). En
+effet avec le pipeline on va commencer à récupérer la valeur du registre
+à conserver avant qu'elle n'ait été modifiée. Pour y remédier il faut
+insérer des NOP pour retarder la recopie le temps que le changement
+de valeur s'effectue.
+
+On détecte les aléas au premier étage du pipeline, si l'instruction
+qui arrive est une copie et que plus loin on a une affectation alors
+on est en présence d'un aléa. Dans ce cas on arrête d'incrémenter
+le pointeur d'instruction et tant que l'aléa est présent on insère
+des NOP.
+\end{document}

@@ -1,0 +1,22 @@
+gérer erreurs :
+  ???
+
+déclarations multiples
+
+Erreurs gerees :
+  erreurs de syntaxe (avec reprise de la comilation)
+  lecture sur var non init
+  Declaration de deux variables/arguments avec le même nom
+  Utilisation d'une variable inconnue
+  affectation sur const
+  utilisation de l'opérateur [] sur une variable non pointeur
+  Appel à une fonction inconnue
+  Appel de fonctions avec mauvais nombre d'arguments
+  Appel de fonctions avec mauvais type d'arguments
+  retour de fonction inexistant ou inapproprié
+ 
+ 
+erreurs non gerees parce que trop chaud :
+  *(EXPR) : on sait pas si EXPR est vraiment un pointeur ou pas
+  Si on fait int a; int * b = &a; *b = 4; a est toujours considérée comme non init
+  On ne peut pas checker si tab[i] est init ou si *(tab + i) est init car ce sont des expressions arithmetiques (en fait on doit pouvoir mais trop la flemme)

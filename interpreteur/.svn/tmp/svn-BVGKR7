@@ -1,0 +1,53 @@
+#define TAILLE_RAM 1000
+#define TAILLE_ROM 1000
+
+struct uneInstruction {
+  void (* ins) (int, int, int);
+  int arg1;
+  int arg2;
+  int arg3;
+};
+typedef struct uneInstruction uneInstruction;
+
+int ram[TAILLE_RAM];
+uneInstruction rom [TAILLE_ROM];
+extern int pc; // instruction pointer 
+extern int nbInstructions;
+
+// set la ram, la rom, pc et nbInstructions
+void initInterpreteur ();
+
+// Ajoute une instruction dans la rom
+// pf_ins est un pointeur sur la fonction de l'instruction (par ex asm_add)
+// arg1 est le premier paramètre passé à pf_ins (obligatoire)
+void ajouterIns (void (* pf_ins) (int, int, int), ...) ;
+
+// Execute les instructions contenues dans la rom
+void execute();
+
+
+// Fonctions ASM
+void asm_add (int adrRes, int adrOp1, int adrOp2);
+void asm_sou (int adrRes, int adrOp1, int adrOp2);
+void asm_mul (int adrRes, int adrOp1, int adrOp2);
+void asm_div (int adrRes, int adrOp1, int adrOp2);
+void asm_afc (int adrRes, int val, int osef);
+void asm_cop (int adrDestination, int adrOrigine, int osef);
+void asm_pri (int adr, int osef, int osef2);
+void asm_jmp (int ins, int osef, int osef2);
+void asm_jmf (int adrCond, int ins, int osef);
+void asm_sup (int adrRes, int adrOp1, int adrOp2);
+void asm_inf (int adrRes, int adrOp1, int adrOp2);
+void asm_equ (int adrRes, int adrOp1, int adrOp2);
+void asm_cpi (int adrRes, int adrOp1, int osef);
+void asm_icp (int adrRes, int adrOp1, int osef);
+void asm_and (int adrRes, int adrOp1, int adrOp2);
+void asm_or (int adrRes, int adrOp1, int adrOp2);
+
+void asm_call (int adr, int osef1, int osef2);
+void asm_ret (int osef1, int osef2, int osef3);
+void asm_push (int adr, int osef1, int osef2);
+void asm_pop (int adr, int osef1, int osef2);
+void asm_movEBPESP (int osef1, int osef2, int osef3) ;
+void asm_movESPEBP (int osef1, int osef2, int osef3) ;
+void asm_incEsp(int inc, int osef1, int osef2); // incrémentation de esp

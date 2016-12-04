@@ -1,0 +1,7 @@
+*.swp
+*.o
+y.tab.*
+y.output
+lex.yy.c
+compilo
+interpreteur

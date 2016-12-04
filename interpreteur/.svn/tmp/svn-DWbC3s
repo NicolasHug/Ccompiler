@@ -1,0 +1,132 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
+
+#include "assembleur.h"
+
+int pc; 
+int esp;
+int ebp;
+int nbInstructions;
+
+void initInterpreteur () {
+  pc = 0;
+  esp = 0;
+  ebp = 0;
+  nbInstructions = 0;
+  memset(ram,0,TAILLE_RAM * sizeof(int));
+  memset(rom,0,TAILLE_ROM * sizeof(uneInstruction));
+}
+
+void ajouterIns (void (* pf_ins) (int, int, int), ...) {
+  va_list ap;
+  va_start(ap,pf_ins);
+  int arg1 = va_arg(ap,int);
+  int arg2 = va_arg(ap,int);
+  int arg3 = va_arg(ap,int);
+
+  // Creation et ajout d'une nouvelle instruction
+  uneInstruction newIns = {pf_ins,arg1,arg2,arg3};
+  rom[nbInstructions++] = newIns;
+  va_end(ap);
+}
+
+void execute () {
+  while (pc < nbInstructions) {
+    rom[pc].ins(rom[pc].arg1, rom[pc].arg2, rom[pc].arg3);
+    pc++;
+  } 
+}
+
+void asm_add (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = ram[ebp + adrOp1] + ram[ebp + adrOp2];
+}
+
+void asm_sou (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = ram[ebp + adrOp1] - ram[ebp + adrOp2];
+}
+
+void asm_mul (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = ram[ebp + adrOp1] * ram[ebp + adrOp2];
+}
+
+void asm_div (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = ram[ebp + adrOp1] / ram[ebp + adrOp2];
+}
+
+void asm_afc(int adrRes, int val,int osef) {
+  ram[ebp + adrRes] = val;
+}
+
+void asm_cop(int adrDestination, int adrOrigine, int osef) {
+  ram[ebp + adrDestination] = ram[ebp + adrOrigine];
+}
+
+void asm_pri(int adr, int osef, int osef2) {
+  printf("%d\n",ram[ebp + adr]);
+}
+
+void asm_jmp(int ins, int osef, int osef2) {
+  pc = ins;
+  pc--; // Pour éviter le pc++ de execute()
+}
+
+void asm_jmf(int adrCond, int ins, int osef) {
+  if (!ram[ebp + adrCond]) {
+    pc = ins;
+    pc--; // Pour éviter le pc++ de execute()
+  }
+}
+
+void asm_sup (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = (ram[ebp + adrOp1] > ram[ebp + adrOp2]);
+}
+
+void asm_inf (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = (ram[ebp + adrOp1] < ram[ebp + adrOp2]);
+}
+
+void asm_equ (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = (ram[ebp + adrOp1] == ram[ebp + adrOp2]);
+}
+
+void asm_cpi (int adrRes, int adrOp1, int osef) {
+  ram[ebp + adrRes] = ram[ebp + ram[ebp + adrOp1]];
+}
+
+void asm_icp (int adrRes, int adrOp1, int osef) {
+  ram[ebp + ram[ebp + adrRes]] = ram[ebp + adrOp1];
+}
+
+void asm_and (int adrRes, int adrOp1, int adrOp2){
+  ram[ebp + adrRes] = ram[ebp + adrOp1] && ram[ebp + adrOp2];
+}
+
+void asm_or (int adrRes, int adrOp1, int adrOp2) {
+  ram[ebp + adrRes] = ram[ebp + adrOp1] || ram[ebp + adrOp2];
+}
+
+void asm_call (int adr, int osef1, int osef2) {
+  ram[esp++] = pc ; // push pc ( pas pc + 1 car l'incrémentation est faite par le execute)
+  pc = adr; 
+  pc--; // Pour éviter le pc++ du execute
+}
+void asm_ret (int osef1, int osef2, int osef3) {
+  pc = ram[--esp];
+}
+void asm_push (int osef, int osef1, int osef2) {
+  ram[esp++] = ebp;
+}
+void asm_pop (int adr, int osef1, int osef2) {
+  ebp = ram[--esp];
+}
+void asm_movEBPESP (int osef1, int osef2, int osef3) {
+  ebp = esp;
+}
+void asm_movESPEBP (int osef1, int osef2, int osef3) {
+  esp = ebp;
+}
+
+void asm_incEsp(int inc, int osef1, int osef2) {
+  esp += inc;
+}

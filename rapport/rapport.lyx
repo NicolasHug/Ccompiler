@@ -1,0 +1,3572 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\begin_preamble
+\usepackage{babel}
+\end_preamble
+\use_default_options false
+\maintain_unincluded_children false
+\language french
+\language_package default
+\inputencoding latin9
+\fontencoding T1
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_amsmath 2
+\use_esint 1
+\use_mhchem 0
+\use_mathdots 0
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 2cm
+\rightmargin 2cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language french
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Rapport de Projet Systèmes Informatiques
+\end_layout
+
+\begin_layout Author
+Nicolas Hug, Maël Zoungrana
+\end_layout
+
+\begin_layout Standard
+\align center
+Enseignants : Eric Alata, Daniela Dragomirescu
+\end_layout
+
+\begin_layout Standard
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Part*
+Introduction
+\end_layout
+
+\begin_layout Standard
+Dans le cadre du projet Systèmes Informatiques, nous avons conçu un compilateur
+ de langage C simplifié, un interpréteur de code assembleur, ainsi qu'un
+ processeur basique en VHDL.
+\end_layout
+
+\begin_layout Standard
+Le compilateur que nous avons mis au point permet de prendre en compte divers
+ aspects du langage C.
+ Nous avons utilisé les logiciels Lex et Yacc pour l'analyse lexicale et
+ le parsage du fichier source C.
+ Lex effectue une analyse lexicale sur le fichier source, et Yacc utilise
+ Lex pour en faire une analyse syntaxique.
+ Nous avons décrit la grammaire de notre langage C dans le fichier yacc,
+ et effectué une série d'actions en fonction du type des symboles (terminaux
+ ou non) que Yacc pouvait rencontrer.
+ La plupart du temps, ces actions écrivent une instruction assembleur dans
+ le fichier assembleur de sortie.
+\end_layout
+
+\begin_layout Standard
+Le fichier assembleur sera lu et interprété par l'interpreteur, qui manipule
+ une ROM où se trouvent les insctructions du programme, une RAM où se trouvent
+ les données manipulées, ainsi que plusieurs registres.
+\end_layout
+
+\begin_layout Standard
+Le processeur est basé sur une architecture avec un pipeline à 5 étage et
+ fonctionne sur 8 bits.
+ Nous avons commencé par créer les différents constituants avant de les
+ assembler à l'intérieur du pipeline.
+ À l'entrée du pipeline on aura l'instruction, elle sera exécutée à travers
+ les différents étages.
+\end_layout
+
+\begin_layout Standard
+La première partie de ce rapport sera consacrée au compilateur et à l'interpréte
+ur, et la seconde détaillera l'implémentation du processeur sur carte FPGA.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Part
+Le compilateur et l'interpréteur
+\end_layout
+
+\begin_layout Standard
+Nous détaillerons dans cette partie les possibilités de notre compilateur,
+ ainsi que les moyens que nous avons utilisés pour les implémenter.
+ La première section traitera de la table des symboles : son utilité, sont
+ utilisation.
+ Les trois sections suivantes détaillerons la mise en place de la compilation
+ des structures de contrôles et boucles, des pointeurs, puis des fonctions.
+ La dernière section expliquera le processus de gestion des erreurs lors
+ de la compilation.
+ L'interpréteur sera rapidement évoqué au travers des différentes sections
+ mais nous n'approfondirons pas son implémentation car son fonctionnement
+ n'est ni très compliqué, ni très intéressant.
+\end_layout
+
+\begin_layout Section
+La table des symboles et les variables
+\end_layout
+
+\begin_layout Subsection
+Table des symboles
+\end_layout
+
+\begin_layout Standard
+La table des symboles est une représentation interne au compilateur qui
+ permet de connaître, à un endroit donné dans le code source C, les variables
+ actuellement connues, ainsi que les arguments passés à une fonction (un
+ symbole est équivalent à une variable, ou à un argument).
+ Ces variables peuvent être déclarées ou non, initialisées ou non, temporaires
+ ou non...
+ Nous avons choisi la structure suivante pour représenter un symbole :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+struct unSymbole {
+\end_layout
+
+\begin_layout Plain Layout
+
+  char * nom;   
+\end_layout
+
+\begin_layout Plain Layout
+
+  int type;
+\end_layout
+
+\begin_layout Plain Layout
+
+  intr estInit;
+\end_layout
+
+\begin_layout Plain Layout
+
+  int estUnArg;
+\end_layout
+
+\begin_layout Plain Layout
+
+}; 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Le champ type peut prendre les valeurs INT (int), PT (pointeur sur int),
+ CONST (const int), ou TEMP (variable temporaire).
+ Le champ estInit indique si la variable est initialisée, et est utilisé
+ pour gérer les erreurs.
+ Le champ estUnArg permet de savoir si la variable est un argument passé
+ à la fonction en cours d'éxecution.
+\end_layout
+
+\begin_layout Standard
+Lorsque Yacc rencontre une règle qui correspond à une déclaration d'entier,
+ de constante ou de pointeur, on demande la création d'un symbole avec les
+ types et noms associés dans la table des symboles.
+ Par exemple, si Yacc rencontre
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+int a;
+\end_layout
+
+\begin_layout Plain Layout
+
+int * b = &a;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On insère le symbole a :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+nom = "a";
+\end_layout
+
+\begin_layout Plain Layout
+
+type = INT;
+\end_layout
+
+\begin_layout Plain Layout
+
+estInit = 0;
+\end_layout
+
+\begin_layout Plain Layout
+
+estUnArg = 0;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Puis le symbole b :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+nom = "b";
+\end_layout
+
+\begin_layout Plain Layout
+
+type = PT;
+\end_layout
+
+\begin_layout Plain Layout
+
+estInit = 1;
+\end_layout
+
+\begin_layout Plain Layout
+
+estUnArg = 0;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Nous avons choisi d'établir que l'indice d'une variable dans la table des
+ symboles correspond à son adresse dans la RAM
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+En réalité ce n'est plus tout à fait vrai depuis la gestion des fonctions
+ avec arguments.
+ Plus de détails section 1.4.2
+\end_layout
+
+\end_inset
+
+.
+ Ainsi, lorsque Yacc rencontre une règle où la variable var est utilisée,
+ on va pouvoir connaître facilement son adresse dans la RAM et écrire les
+ instructions assembleur manipulant cette adresse de façon à réaliser l'action
+ souhaitée.
+\end_layout
+
+\begin_layout Subsection
+Expressions arithmétiques, variables temporaires
+\end_layout
+
+\begin_layout Standard
+Nous utilisons des variables temporaires pour évaluer les expressions arithmétiq
+ues.
+ Les expressions arithmetiques sont utilisées sur de nombreuses règles,
+ comme la règle suivante qui permet d'affecter une valeur à une variable
+ :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Affectation : tNom tEgal Expr_Arithmetique;
+\end_layout
+
+\end_inset
+
+Elles permettent aussi par exemple d'évaluer une condition, dans une structure
+ de contrôle :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Structure_If : tIf tPrt_Ouv Expr_Arithmetique tPrt_Ferm tAcc_Ouv Instructions
+ tAcc_Ferm;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+L'évaluation d'une expression arithmétique par Yacc renvoie toujours une
+ adresse (une adresse dans la RAM).
+ Cette adresse est celle d'une variable temporaire contenant la valeur de
+ l'expression, et elle peut ensuite être utilisée dans les règles utilisant
+ les expressions arithmétiques.
+\end_layout
+
+\begin_layout Standard
+Détaillons l'évaluation par Yacc de la ligne de code suivante :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+a = b;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Yacc constate que la règle à appliquer à cette ligne est celle vue plus
+ haut, à laquelle est en fait associée une action :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Affectation : tNom tEgal Expr_Arithmetique {actionAffectation($1,$3);} ;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Le symbole 
+\shape slanted
+Expr_Arithmetique 
+\shape default
+est évalué selon la règle suivante :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Expr_Arithmetique : tNom {$$ = actionExprNom($1);} ; 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+L'action 
+\shape slanted
+actionExprNom
+\shape default
+ est de créer une variable temporaire, dans laquelle sera copiée la valeur
+ de la variable représentée par 
+\shape slanted
+tNom
+\shape default
+ (donc dans notre cas b), et de renvoyer son adresse
+\shape slanted
+.
+ 
+\shape default
+C'est la première action réalisée.
+ La suivante est 
+\shape slanted
+actionAffectation
+\shape default
+, et son rôle est de copier la valeur située dans la variable temporaire
+ (c'est à dire la valeur de l'expression arithmétique évaluée, donc la valeur
+ de b) dans la variable représentée par 
+\shape slanted
+tNom
+\shape default
+ (donc dans notre cas a).
+\end_layout
+
+\begin_layout Standard
+En supposant que a se trouve à l'adresse 0 dans la table des symboles, que
+ b se trouve à l'adresse 1, et que leurs valeurs respectives sont 2 et 3,
+ voici l'évolution de la table des symboles au cours de l'évaluation par
+ Yacc de l'affectation, et l'évolution de la RAM au cours de l'interprétation
+ du code assembleur généré :
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="6" columns="5">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Etat initial 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+table 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a, INT 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+b,INT 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+/
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+ram 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+/
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Création d'une variable temporaire et copie de la valeur de b 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+table 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a, INT 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+b,INT 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+*, TEMP
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+ram 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Copie de la valeur de la variable temporaire dans a 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+table 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a, INT 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+b,INT 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+*, TEMP
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+ram 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On constate trois choses : 
+\end_layout
+
+\begin_layout Itemize
+La première est que la table des symboles ne se préoccupe en aucun cas de
+ la valeur des variables qu'elle contient.
+ La table des symboles n'existe que lors de la phase de compilation et ne
+ sert qu'à connaître les adresses des variables que l'on souhaite lire ou
+ écrire.
+ 
+\end_layout
+
+\begin_layout Itemize
+La seconde est qu'après l'évaluation de l'expression arithmétique, une variable
+ temporaire occupe inutilement la table des symboles.
+ Il est donc nécessaire de nettoyer la table des symboles après chaque règle
+ mettant en jeu des expressions arithmétiques.
+ 
+\end_layout
+
+\begin_layout Itemize
+La troisième est que la création de variables temporaires à chaque expression
+ arithmétique est loin d'être optimale, que ce soit en terme de temps d'exécutio
+n ou de mémoire : pour une simple addition entre deux variables, on utilise
+ deux variables temporaires (on pourrait même en utiliser trois...), et on
+ effectue deux copies.
+ Bien que non optimisée, cette solution est relativement simple à implémenter,
+ c'est pourquoi nous l'avons conservée.
+ 
+\end_layout
+
+\begin_layout Section
+Structures de contrôle et boucles
+\end_layout
+
+\begin_layout Standard
+La compilation des structures de contrôle et des boucles génère des instructions
+ assembleur de saut et de saut conditionnel.
+ Par exemple, pour une simple structure if
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+if (condition){
+\end_layout
+
+\begin_layout Plain Layout
+
+  /* Code */
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+demande l'écriture d'une instruction de saut conditionnel telle que la suivante
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+JMF condition #ligne
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code assembleur correspondant à celui contenu entre les accolades */
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+où #ligne est le numéro de la ligne à laquelle on doit sauter si condition
+ n'est pas vraie.
+ #ligne correspond à la première ligne de code assembleur située juste après
+ celui correspondant au code contenu entre les accolades du if.
+ Le problème qui se pose, autant pour les structures de contrôle que pour
+ les boucles, est que lorsque Yacc parse pour la première fois le fichier
+ source, on ne peut pas connaître à l'avance #ligne, tout simplement parce
+ qu'on n'a pas encore parsé la suite du fichier, et on n'a donc pas rencontré
+ l'accolade fermante.
+ On ne peut par conséquent pas écrire l'instruction de saut complète en
+ une seule passe.
+ Par contre, à la fin du parsage, on est tout à fait capable de savoir quel
+ saut doit sauter à quelle ligne, puisque toutes les accolades fermantes
+ ont été rencontrées.
+\end_layout
+
+\begin_layout Standard
+La phase de compilation comporte donc deux passes : la première correspond
+ au parsage par Yacc, dans laquelle on écrit seulement partielement les
+ instructions de saut dont on ne connait pas encore le numéro de la ligne
+ à laquelle sauter (typiquement 'JMF cond @' ou 'JMP @'), en prenant tout
+ de même soin de garder une correspondance saut - ligne à laquelle sauter
+ une fois qu'on est en mesure de connaître les lignes auxquelles sauter.
+ La seconde passe consiste à remplacer tous les '@' écrits dans le fichier
+ de sortie par le numéro de ligne adéquat, ceci étant possible grâce à la
+ correspondance saut - ligne à laquelle sauter établie lors de la première
+ passe.
+\end_layout
+
+\begin_layout Standard
+Nous allons détailler comment nous établissons la correspondance nécessaire
+ pour les différentes structures et boucles que nous pouvons utiliser dans
+ notre langage C dans les sections suivantes.
+\end_layout
+
+\begin_layout Subsection
+Structures if et else
+\end_layout
+
+\begin_layout Subsubsection
+If simple
+\end_layout
+
+\begin_layout Standard
+Voici la grammaire correspondant à une structure de contrôle if.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+/* STRUCTURE IF */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Structure_If :   tIf tPrt_Ouv Expr_Arithmetique tPrt_Ferm
+\end_layout
+
+\begin_layout Plain Layout
+
+		tAcc_Ouv Instructions tAcc_Ferm;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On utilise deux structures de données : un tableau contenant un couple ligne
+ du saut - ligne où sauter qui est rempli au fur et à mesure (et qui est
+ lu lors de la seconde passe), et une pile de saut.
+ La pile contient en fait les indices des sauts dans le tableau, car il
+ est inutile de dupliquer les données.
+ L'utilisation d'une pile permet d'imbriquer les if les uns dans les autres.
+\end_layout
+
+\begin_layout Standard
+Lorsque Yacc rencontre un symbole de type Structure_If, on ajoute un saut
+ dans le tableau.
+ Le nouveau saut du tableau est partiellement rempli : on ne connait pour
+ l'instant que la ligne à laquelle le saut est écrit.
+ Ce saut est un saut conditionnel qui évalue la condition représentée par
+ le symbole Expr_Arithmetique, et on écrit donc dans le fichier assembleur
+ la ligne suivante :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+JMF X @
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+où X est l'adresse où se trouve l'évaluation de l'expression arithmetique.
+ Le caractère '@' sera remplacé lors de la seconde passe.
+\end_layout
+
+\begin_layout Standard
+Lorsque Yacc arrive au symbole tAcc_Ferm, on sait que c'est ici
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+ici = nombre de lignes assembleurs déjà écrites + 1
+\end_layout
+
+\end_inset
+
+ que le saut écrit correspondant doit sauter.
+ Ce saut en question est le saut qui est au sommet de la pile : ce n'est
+ pas forcément le dernier saut qui a été empilé parce qu'il y a pu avoir
+ des imbrications de if, mais comme les précédents ont été dépilés, on est
+ sûr que c'est celui du sommet.
+ On dépile donc le saut, en prenant soin mettre à jour le champ 
+\begin_inset Quotes eld
+\end_inset
+
+ligne de saut
+\begin_inset Quotes erd
+\end_inset
+
+ dans le tableau des sauts.
+\end_layout
+
+\begin_layout Subsubsection
+If else
+\end_layout
+
+\begin_layout Standard
+Voici la grammaire correspondant à une structure if - else.
+ On remarque que l'utilisation des accolades est obligatoire :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Structure_If : Structure_If Structure_Else;
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+Structure_Else : tElse tAcc_Ouv Instructions tAcc_Ferm; 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+La compilation d'un bout de programme tel que celui-ci :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+if (condition) {
+\end_layout
+
+\begin_layout Plain Layout
+
+  /* Code if*/
+\end_layout
+
+\begin_layout Plain Layout
+
+} else {
+\end_layout
+
+\begin_layout Plain Layout
+
+  /* Code else */
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+doit générer l'écriture d'un code assembleur tel que celui-ci :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+JMF condition #ligne1
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code assembleur correspondant à celui contenu entre les accolades du
+ if */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMP #ligne2
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code assembleur correspondant à celui contenu entre les accolades du
+ else */
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+#ligne1 serait le numéro de la ligne juste en dessous de JMP #ligne2, et
+ #ligne2 serait le numéro de la ligne située à la fin du code assembleur
+ contenu entre les accolades du else.
+ On constate que rien ne change par rapport à la compilation d'un if simple.
+ Seul l'ajout d'un saut inconditionnel diffère du méchanisme précédent.
+ En réalité, à la fin d'une structure if, on écrit un 'JMP @', même s'il
+ n'y a pas de else derrière.
+ Par défaut, @ prend la valeur du numéro de la ligne suivante.
+ Donc s'il n'y a pas de else, on saute à la ligne suivante, c'est à dire
+ qu'on ne fait rien du tout.
+ Par contre, s'il y a bien un else, on prend en compte ce saut et on remplace
+ '@' par la valeur adéquate.
+\end_layout
+
+\begin_layout Subsection
+Boucles while
+\end_layout
+
+\begin_layout Standard
+Voici la grammaire d'une boucle while :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+/* BOUCLE WHILE */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Boucle_While : tWhile tPrt_Ouv Expr_Arithmetique tPrt_Ferm tAcc_Ouv  Instruction
+s tAcc_Ferm;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Les structures de données utilisées sont exactement les mêmes que pour la
+ compilation des structures de contrôle if else : un tableau contenant un
+ couple ligne du saut - ligne où sauter, et une pile de saut.
+ Le bout de programme suivant :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+while (condition) {
+\end_layout
+
+\begin_layout Plain Layout
+
+  /* Code */
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+doit générer l'écriture d'un code assembleur tel que celui_ci :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+JMF condition #ligne1
+\end_layout
+
+\begin_layout Plain Layout
+
+	/* Code assembleur correspondant à celui contenu entre les accolades */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMP #ligne2
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+où #ligne1 correspond au numéro de la ligne juste en dessous de celle où
+ est écrit le JMP, et où #ligne2 correspond à une ligne située au dessus
+ du JMF.
+ En fait, le JMP doit renvoyer au dessus du JMF : il doit renvoyer à la
+ ligne où commence l'évaluation de la condition.
+ En effet, il faut réévaluer la condition à chaque fin de boucle, sinon
+ le programme partirait en boucle infinie.
+ La compilation d'une boucle while est très similaire à celle d'une structure
+ if, la différence majeure résidant dans le besoin de réévaluation de l'expressi
+on arithmétique.
+\end_layout
+
+\begin_layout Subsection
+Boucles for
+\end_layout
+
+\begin_layout Standard
+Voici la grammaire d'une boucle for :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+Boucle_For : tFor tPrt_Ouv Affectation tPt_Virgule {condFor();}
+\end_layout
+
+\begin_layout Plain Layout
+
+	Expr_Arithmetique {fprintf_jmf($6); fprintf_jmp(); debutFor();} tPt_Virgule
+\end_layout
+
+\begin_layout Plain Layout
+
+	Affectation {fprintf_jmp(); milieuFor();} tPrt_Ferm
+\end_layout
+
+\begin_layout Plain Layout
+
+	tAcc_Ouv Instructions {finFor(); fprintf_jmp();} tAcc_Ferm ;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Nous avons considéré que dans les parenthèses on ne peut faire qu'une affectatio
+n car c'est comme cela que l'on utilise les boucle for la plupart du temps.
+\end_layout
+
+\begin_layout Standard
+La compilation de ce code :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+for (pré-affectation; condition; post-affectation) {
+\end_layout
+
+\begin_layout Plain Layout
+
+  /* Code */
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Doit donner ce code assembleur :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+AFC @résultat valeur /* pré-affection */
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code correspondant à l'évaluation de condition */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMF condition #ligne1
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code assembleur correspondant à celui contenu entre les accolades */
+\end_layout
+
+\begin_layout Plain Layout
+
+AFC @résultat valeur /* post-affectation */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMP #ligne2
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Avec #ligne1 la ligne en dessous du deuxième JMP et #ligne2 la ligne du
+ début de l'évaluation de la condition.
+ (On ne refait pas la pré-affectation)
+\end_layout
+
+\begin_layout Standard
+Cependant pour obtenir ce résultat il faut changer l'ordre des différentes
+ parties du for, nous avons donc choisi une façon plus simple de le faire
+ mais utilisant plus d'instructions de saut :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+AFC @résultat valeur /* pré-affection */
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code correspondant à l'évaluation de condition */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMF condition #ligne1
+\end_layout
+
+\begin_layout Plain Layout
+
+JMP #ligne2
+\end_layout
+
+\begin_layout Plain Layout
+
+AFC @résultat valeur /* post-affectation */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMP #ligne3
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Code assembleur correspondant à celui contenu entre les accolades */
+\end_layout
+
+\begin_layout Plain Layout
+
+JMP #ligne4
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On a alors #ligne1 la ligne en dessous du dernier JMP, #ligne2 la ligne
+ du début des instructions qui étaient entre les accolades (en dessous du
+ deuxième JMP), #ligne3 la ligne de la post-affectation et #ligne4 la ligne
+ du début de l'évaluation de la condition.
+\end_layout
+
+\begin_layout Standard
+On utilise les mêmes structures que précédemment pour mémoriser les lignes
+ où sont placées les instructions de saut et celles auxquelles elles renvoient,
+ mais comme il y a plusieurs sauts reliés entre eux de différentes façons
+ nous utilisons en plus une structure spécifique aux boucles for.
+ Au fur et à mesure de l'avancée du compilateur dans la boucle for on va
+ remplir cette structure, et lorsqu'on sera à la fin on établira toutes
+ les correspondances ligne - saut nécessaires au bon déroulement de la deuxième
+ passe.
+\end_layout
+
+\begin_layout Section
+Pointeurs et tableaux
+\end_layout
+
+\begin_layout Standard
+Les programmes compilés par notre compilateur peuvent contenir des pointeurs.
+ Nous avons implémenté les pointeurs sur des entiers uniquement (on ne peux
+ pas faire de pointeur de pointeur).
+ En C, les pointeurs et les tableaux sont deux types de données très proches
+ (un tableau est un pointeur constant).
+ Dans notre langage, nous ne différencions pas les pointeurs et les tableaux.
+ Ils peuvent s'utiliser aussi bien avec les opérateur '*' que [].
+ L'implémentation des pointeurs/tableaux n'est pas une chose très compliquée.
+ Nous avons eu besoin de trois nouveaux opérateurs :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+/* Operateur * (pointeur) */
+\end_layout
+
+\begin_layout Plain Layout
+
+Expr_Arithmetique : tFois Expr_Arithmetique
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Operateur & */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Expr_Arithmetique : tEt tNom
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Operateur [] */ Expr_Arithmetique : tNom tCroch_Ouv Expr_Arithmetique
+ tCroch_Ferm;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+ainsi que de deux nouveaux types de déclaration :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+/* Declaration pointeur */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Declarations : tInt tFois tNom tPt_Virgule; 
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Declaration tableau */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Declarations : tInt tNom tCroch_Ouv tEntier tCroch_Ferm tPt_Virgule;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+et de deux nouveaux types d'affectation :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+/* Affectation indirecte (opérateur *) */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Affectation : tFois Expr_Arithmetique tEgal Expr_Arithmetique;
+\end_layout
+
+\begin_layout Plain Layout
+
+/* Affectation indirecte (opérateur []) */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Affectation : tNom tCroch_Ouv Expr_Arithmetique tCroch_Ferm tEgal Expr_Arithmeti
+que;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Côté assembleur, il nous a fallut ajouter deux nouvelles instructions qui
+ correspondent à des copies indirectes :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CPI adr1 adr2 <=> ram[adr1] = ram[ram[adr2]];
+\end_layout
+
+\begin_layout Plain Layout
+
+et
+\end_layout
+
+\begin_layout Plain Layout
+
+ICP adr1 adr2 <=> ram[ram[adr1]] = ram[adr2];
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+La déclaration d'un pointeur alloue simplement un case en mémoire, au même
+ titre que la déclaration d'un entier.
+ La déclaration d'un tableau alloue une case mémoire pour un pointeur, puis
+ autant de cases qu'il y a d'éléments dans le tableau.
+ Le pointeur alloué précédemment pointe sur la première case du tableau
+ (soit la case suivante).
+\end_layout
+
+\begin_layout Standard
+La compilation du code suivant : 
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+int * a;
+\end_layout
+
+\begin_layout Plain Layout
+
+int b = 0;
+\end_layout
+
+\begin_layout Plain Layout
+
+a = &b;
+\end_layout
+
+\begin_layout Plain Layout
+
+*a = 3;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+générera le code assembleur suivant (on omettra quelques variables temporaires
+ par soucis de simplicité) :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+afc 1 0 /* affectation de 0 à b situé à la case 1 (a est à la case 0) */
+\end_layout
+
+\begin_layout Plain Layout
+
+afc 2 1 /* variable temporaire en case 2 contenant l'adresse de b : 
+\end_layout
+
+\begin_layout Plain Layout
+
+        c'est l'évaluation de l'expression arithmétique */
+\end_layout
+
+\begin_layout Plain Layout
+
+cop 0 2 /* a vaut l'adresse de b */
+\end_layout
+
+\begin_layout Plain Layout
+
+afc 2 3 /* variable temporaire en case 2 contenant la valeur 3 */
+\end_layout
+
+\begin_layout Plain Layout
+
+icp 0 2 /* la variable pointée par a vaut la valeur contenue à la case 2
+ : 
+\end_layout
+
+\begin_layout Plain Layout
+
+        b vaut maintenant 3 */
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Inversement, la compilation du code suivant :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+int * a;
+\end_layout
+
+\begin_layout Plain Layout
+
+int b = 3;
+\end_layout
+
+\begin_layout Plain Layout
+
+int c = 0;
+\end_layout
+
+\begin_layout Plain Layout
+
+a = &b;
+\end_layout
+
+\begin_layout Plain Layout
+
+c = *a;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+générera le code assembleur suivant (ici aussi on omettra quelques variables
+ temporaires par soucis de simplicité) :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+afc 1 3 /* affectation de 3 à b situé à la case 1 (a est à la case 0 et
+ c à la case 2) */
+\end_layout
+
+\begin_layout Plain Layout
+
+afc 2 0 /* affectation de 0 à c */
+\end_layout
+
+\begin_layout Plain Layout
+
+afc 3 1 /* variable temporaire en case 2 contenant l'adresse de b : 
+\end_layout
+
+\begin_layout Plain Layout
+
+        c'est l'évaluation de l'expression arithmétique */
+\end_layout
+
+\begin_layout Plain Layout
+
+cop 0 3 /* a vaut l'adresse de b */
+\end_layout
+
+\begin_layout Plain Layout
+
+cop 3 0 /* variable temporaire contenant l'adresse de a */
+\end_layout
+
+\begin_layout Plain Layout
+
+cpi 2 3 /* c vaut la valeur de la variable pointée par a, soit 3 */
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+La compilation de l'utilisation des tableaux est très similaire.
+ Pour accéder à la nième case d'un tableau, il suffit d'ajouter n : 
+\end_layout
+
+\begin_layout Itemize
+soit en tant qu'offset au icp (dans le cas d'une affectation) 
+\end_layout
+
+\begin_layout Itemize
+soit à la variable temporaire contenant l'adresse de la variable pointée
+ dont la valeur doit être copiée (dans le cas d'un cpi, donc une lecture).
+ 
+\end_layout
+
+\begin_layout Section
+Les fonctions
+\end_layout
+
+\begin_layout Subsection
+Fonctions récursives basiques
+\end_layout
+
+\begin_layout Standard
+Pour pouvoir compiler des programmes mettant en jeu des fonctions récursives
+ basiques (sans retour et sans arguments), il nous a fallu modifier la structure
+ de notre langage C.
+ Auparavant, la grammaire d'un programme C était celle-ci :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+ProgrammeC : tInt tMain tPrt_Ouv tPrt_Ferm tAcc_Ouv Corps tAcc_Ferm;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Pour pouvoir prendre en compte les fonctions autres que le main, nous l'avons
+ changé de cette façon :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+ProgrammeC : Fonctions; /* Un programme C est une fonction unique, ou une
+ suite de fonctions */
+\end_layout
+
+\begin_layout Plain Layout
+
+Fonctions : Fonction Fonctions;
+\end_layout
+
+\begin_layout Plain Layout
+
+Fonctions : Fonction;
+\end_layout
+
+\begin_layout Plain Layout
+
+Fonction : Type tNom tPrt_Ouv Arguments tPrt_Ferm tAcc_Ouv Corps tAcc_Ferm;
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Les symboles Type et Arguments ne sont pas pris en compte pour l'instant.
+ Pour gérer des fonctions récursives, un moyen simple est de considérer
+ la RAM comme une pile, et donc d'introduire deux nouveaux registres : 
+\end_layout
+
+\begin_layout Itemize
+ebp : pointeur de base de la pile.
+ La valeur de ebp est constante pendant l'exécution d'une fonction 
+\end_layout
+
+\begin_layout Itemize
+esp : pointeur du haut de la pile.
+ La valeur de esp évolue pendant l'éxécution d'une fonction : esp pointe
+ sur la première case mémoire libre.
+ 
+\end_layout
+
+\begin_layout Standard
+Un appel de fonction en C n'est rien d'autre qu'un bout de code assembleur
+ à exécuter avant de revenir au cours d'exécution normal du programme.
+ Lors d'un appel, on sauvegarde le contexte d'exécution de la fonction appelante
+, puis on saute à l'endroit où se trouve le code de la fonction appelée.
+ Une fois la fonction exécutée, on n'a plus qu'à réstaurer le contexte de
+ la fonction appelante pour continuer l'exécution du programme.
+ Comme la sauvegarde et la restauration de contexte se font à l'aide d'une
+ pile, les fonctions peuvent être récursives.
+\end_layout
+
+\begin_layout Standard
+Pour sauvegarder le contexte d'une fonction, il suffit de : 
+\end_layout
+
+\begin_layout Itemize
+sauvegarder l'adresse de retour de la fonction appelante (pusher le registre
+ pc
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+En fait il faut pusher pc + 1 pour revenir à la ligne suivante et ne pas
+ effectuer la même fonction en boucle
+\end_layout
+
+\end_inset
+
+) 
+\end_layout
+
+\begin_layout Itemize
+sauvegarder la base actuelle de la pile (pusher le registre ebp) 
+\end_layout
+
+\begin_layout Itemize
+créer un nouveau contexte pour la fonction appelée (ebp = esp;).
+ 
+\end_layout
+
+\begin_layout Standard
+Après la sauvegarde du contexte, on saute tout simplement à l'endroit où
+ débute le code de la fonction appelée (pc = #ligne), et on l'exécute.
+ A la fin de cette fonction, on fait les opérations inverses pour réstaurer
+ le contexte de la fonction appelante : 
+\end_layout
+
+\begin_layout Itemize
+détruire le contexte de la fonction appelée en restaurant esp à sa valeur
+ précédente (esp = ebp;) 
+\end_layout
+
+\begin_layout Itemize
+restaurer ebp à sa valeur précédente (poper le registre ebp) 
+\end_layout
+
+\begin_layout Itemize
+restaurer pc à sa valeur précédente (poper le registre pc) 
+\end_layout
+
+\begin_layout Standard
+Evidemment, l'utilisation des registres ebp et esp implique d'une part de
+ n'accéder à la RAM que de manière 
+\series bold
+relative 
+\series default
+à ebp (et non plus de manière absolue par rapport à la case 0), et d'autre
+ part de vider la table des symboles à chaque fois que l'on rentre dans
+ une fonction lors de la compilation.
+ C'est grâce à cela que l'on peut se permettre, entre autres, d'avoir deux
+ variables avec le même noms dans deux fonctions différentes.
+\end_layout
+
+\begin_layout Subsection
+Gestion des arguments
+\end_layout
+
+\begin_layout Standard
+Nous avons amélioré la compilation des fonctions en permettant le passage
+ de paramètres.
+ Une fonction peut prendre des paramètres de type int, const int, ou int
+ *.
+ Par contre, lors de l'appel de la fonction, on ne peut passer que des variables
+ en argument :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+void f(int a, int * b) {
+\end_layout
+
+\begin_layout Plain Layout
+
+  /* code */
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+int main() {
+\end_layout
+
+\begin_layout Plain Layout
+
+  int a = 0;
+\end_layout
+
+\begin_layout Plain Layout
+
+  int b = &a;
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+  f(a,b);  	/* Appel autorisé */
+\end_layout
+
+\begin_layout Plain Layout
+
+  f(a,&a);	/* Appel interdit */
+\end_layout
+
+\begin_layout Plain Layout
+
+  f(0,b);  	/* Appel interdit */
+\end_layout
+
+\begin_layout Plain Layout
+
+  f(a + 4,b);     /* Appel interdit */
+\end_layout
+
+\begin_layout Plain Layout
+
+  return 0;
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Lorsque Yacc découvre la déclaration d'une nouvelle fonction, on ajoute
+ dans la table des symboles autant de symboles qu'il y a d'arguments.
+ Les arguments d'une fonction sont donc les premiers symboles présents dans
+ la table des symboles de la fonction.
+ Lors d'un appel de fonction, les valeurs des arguments sont pushées dans
+ la RAM, avant même de pusher pc.
+ Voici la table des symboles et l'état de la RAM pendant l'exécution de
+ cette fonction :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+void f(int a, int * b) {
+\end_layout
+
+\begin_layout Plain Layout
+
+  int c;
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="4" columns="7">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Table 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+4 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+5
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+b 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+c 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+/ 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+/ 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+/
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+RAM 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+- 4 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+- 3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+- 2 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+- 1 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+b 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+pc 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+ebp 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+? 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+c
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Les adresses dans la RAM sont données relativement à ebp (ebp est en 0),
+ conformément à la logique de fonctionnement de l'interpréteur.
+ La table des symboles doit donc être capable de renvoyer la valeur -4 lorsque
+ l'on recherche l'adresse de a, -3 lorsque l'on recherche l'adresse de b,
+ et 1 lorsque l'on recherche l'adresse de c.
+ Plutôt que de renvoyer tout simplement l'indice de du symbole dans la table
+ des symboles (comme c'était le cas auparavant), notre fonction getAdresse()
+ a donc été modifiée :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+int getAdresse(unSymbole s) {
+\end_layout
+
+\begin_layout Plain Layout
+
+  int adresse;
+\end_layout
+
+\begin_layout Plain Layout
+
+  if (s.estUnArg) {
+\end_layout
+
+\begin_layout Plain Layout
+
+    adresse =  -(nombreArguments - indice(s)) - 2; /* -2 car il y a ebp
+ et pc pushés */
+\end_layout
+
+\begin_layout Plain Layout
+
+  } else {
+\end_layout
+
+\begin_layout Plain Layout
+
+    adresse =  -(nombreArguments - indice(s));
+\end_layout
+
+\begin_layout Plain Layout
+
+  }
+\end_layout
+
+\begin_layout Plain Layout
+
+  return adresse;
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Pour la variable a, getAdresse() renverra -(2 - 0) - 2 soit -4.
+ Pour c, on aura -(2 - 2) soit 0, ce qui correspond aux valeurs attendues
+ 
+\backslash
+o/.
+\end_layout
+
+\begin_layout Subsection
+Gestion de la valeur de retour
+\end_layout
+
+\begin_layout Standard
+La gestion des retours de fonctions a été assez simple.
+ Nous avons créé un nouveau registre (erp), et une nouvelle instruction
+ dans notre grammaire :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+/* Retour */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Instructions : tReturn Expr_Arithmetique tPt_Virgule; 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Lorsque l'on rencontre cette instruction, on sauvegarde dans erp la valeur
+ contenue à l'adresse renvoyée par l'évaluation du symbole Expr_Arithmetique.
+ Une nouvelle expression arithmétique a elle aussi été crée :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+/* Appel de fonction */ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Expr_Arithmetique : tNom tPrt_Ouv PassageArguments tPrt_Ferm;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Cette expression arithmétique correspond à un appel de fonction.
+ Elle renvoie l'adresse d'une variable temporaire contenant la valeur de
+ erp.
+ On peut donc évaluer des appels de fonctions en tant que condition, affecter
+ des variables à la valeur de retour d'une fonction, etc...
+\end_layout
+
+\begin_layout Section
+Gestion des erreurs
+\end_layout
+
+\begin_layout Standard
+Notre compilateur peut détecter différents types d'erreurs dans le programme
+ source C.
+ Si l'on détecte une erreur dans le programme C, la seconde passe n'est
+ pas effectuée.
+ Le fichier assembleur n'est donc pas changé si le fichier source contient
+ des erreurs.
+\end_layout
+
+\begin_layout Subsection
+Erreurs de syntaxe
+\end_layout
+
+\begin_layout Standard
+Les erreurs de syntaxe sont détectées par Yacc.
+ Ceci se fait par l'écriture de nouvelles règles :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Fonction : error;
+\end_layout
+
+\begin_layout Plain Layout
+
+Corps : Declarations  Instructions | error;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Ceci indique à Yacc qu'il peut survenir des erreurs dans la déclaration
+ d'une fonction ou dans son corps.
+ Ceci lui permet de continuer tout de même son parsage après avoir rencontré
+ des erreurs.
+ Yacc indique automatiquement le caractère de l'erreur rencontrée grâce
+ à l'option %error-verbose.
+\end_layout
+
+\begin_layout Subsection
+Autres types d'erreurs gérés
+\end_layout
+
+\begin_layout Standard
+De très nombreux types d'erreurs ne peuvent pas être gérés uniquement par
+ Yacc.
+ Nous expliquerons brièvement quels sont les autres types d'erreurs gérés
+ par notre compilateur, et comment il procède pour les détecter :
+\end_layout
+
+\begin_layout Subsubsection*
+Utilisation d'une variable inconnue 
+\end_layout
+
+\begin_layout Standard
+Lorsqu'on utilise une variable, que ce soit pour une affectation ou une
+ lecture, on utilise la fonction getAdresse().
+ Cette fonction sait si la variable existe dans la table des symboles et
+ provoque une erreur si ce n'est pas le cas.
+\end_layout
+
+\begin_layout Subsubsection*
+Lecture sur variable non initialisée ou non existante
+\end_layout
+
+\begin_layout Standard
+La lecture d'une variable se fait obligatoirement l'évaluation de l'expression
+ arithmétique suivante :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+Expr_Arithmetique : tNom;
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Lorsqu'une telle expression arithmétique est rencontrée, on détermine si
+ le symbole associé à tNom est bien initialisé.
+\end_layout
+
+\begin_layout Standard
+On peut bien évidemment combiner les deux types d'erreurs précédents :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+int main () {
+\end_layout
+
+\begin_layout Plain Layout
+
+  int a;
+\end_layout
+
+\begin_layout Plain Layout
+
+  v = a;
+\end_layout
+
+\begin_layout Plain Layout
+
+  return 0;
+\end_layout
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On obtiendra les deux erreurs suivantes :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+ERREUR : Lecture sur a 0 non initialisee (line 3) 
+\end_layout
+
+\begin_layout Plain Layout
+
+ERREUR : Symbole v inconnu (line 3) 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection*
+Declaration de deux variables/arguments avec le même nom 
+\end_layout
+
+\begin_layout Standard
+Lors de la création d'un symbole, on vérifie qu'il n'en existe pas un avec
+ le même nom dans la table des symboles.
+ Ceci veut dire aussi qu'on ne peut pas déclarer une variable qui aurait
+ le même nom qu'un argument, puisque les arguments sont présents dans la
+ table des symboles au même titre que les variables.
+\end_layout
+
+\begin_layout Subsubsection*
+Affectation sur une constante
+\end_layout
+
+\begin_layout Standard
+Un constante doit être initialisée lors de sa déclaration (c'est une règle
+ de la grammaire).
+ Lorsque l'on affecte une variable, on vérifie que celle-ci n'est pas une
+ constante à l'aide de la table des symboles.
+ Notons qu'il est tout de même possible de modifier la valeur d'une constante
+ au cours de l'exécution, de la manière suivante :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+int main () {
+\end_layout
+
+\begin_layout Plain Layout
+
+  const int a = 0;   
+\end_layout
+
+\begin_layout Plain Layout
+
+  int * b = &a;    
+\end_layout
+
+\begin_layout Plain Layout
+
+  *b = 2;  
+\end_layout
+
+\begin_layout Plain Layout
+
+  return 0; 
+\end_layout
+
+\begin_layout Plain Layout
+
+} 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+En effet, on ne déclare que des pointeurs sur int, mais on ne vérifie pas
+ qu'ils pointent véritablement sur des int (gcc mettrait un warning ici,
+ mais un vulgaire cast le ferait taire).
+\end_layout
+
+\begin_layout Subsubsection*
+Utilisation de l'opérateur [] sur une variable non pointeur pour une affectation
+\end_layout
+
+\begin_layout Standard
+Lorsque l'opérateur []
+\begin_inset space ~
+\end_inset
+
+est utilisé, on vérifie que la variable sur laquelle il opère est bien un
+ pointeur à l'aide de la table des symboles.
+\end_layout
+
+\begin_layout Subsubsection*
+Appel à une fonction inconnue
+\end_layout
+
+\begin_layout Standard
+On tient à jour une table des fonctions, qui contient diverses informations
+ sur les fonctions déjà parsées.
+ Lorsque Yacc rencontre un appel de fonction, on vérifie que cette fonction
+ existe bien dans la table des fonctions.
+\end_layout
+
+\begin_layout Subsubsection*
+Appel de fonctions avec mauvais nombre d'arguments
+\end_layout
+
+\begin_layout Standard
+La table des fonctions permet de savoir combien d'arguments prend une fonction.
+ Lors de l'appel à une fonction, on vérifie que le nombre d'arguments passés
+ correspond au nombre d'arguments de la fonction.
+ Le comptage des arguments passés se fait comme ceci :
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status collapsed
+
+\begin_layout Plain Layout
+
+/* Appel de fonction (valeur de retour négligée)*/ 
+\end_layout
+
+\begin_layout Plain Layout
+
+Appel : tNom {debutAppel($1);} tPrt_Ouv PassageArguments tPrt_Ferm {appel($1,$4)
+;};
+\end_layout
+
+\begin_layout Plain Layout
+
+PassageArguments : {$$ = 0;}; 
+\end_layout
+
+\begin_layout Plain Layout
+
+PassageArguments : Pargs; 
+\end_layout
+
+\begin_layout Plain Layout
+
+Pargs : tNom {pushParam($1);} tVirgule Pargs {$$=$4+1;}; /* Compage du nombre
+ d'arguments */
+\end_layout
+
+\begin_layout Plain Layout
+
+Pargs : tNom {pushParam($1); $$=1;}; 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection*
+Appel de fonctions avec mauvais type d'arguments 
+\end_layout
+
+\begin_layout Standard
+La table des fonctions permet de savoir quel est le type de chaque argument.
+ Lorsque l'on push un paramètre, on compare son type avec celui attendu.
+\end_layout
+
+\begin_layout Subsubsection*
+Retour de fonction inexistant ou inapproprié 
+\end_layout
+
+\begin_layout Standard
+La table des fonctions permet de savoir si une fonction doit retourner (c'est
+ à dire qu'elle ne retourne pas void), et si elle a déjà retournée (c'est
+ à dire qu'au moins un return été écrit).
+ A la fin de la fonction, on vérifie que si la fonction doit retourner,
+ alors un return a déjà été écrit, et que si elle ne doit pas retourner
+ aucun return n'a été écrit.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Part
+Le processeur sur FPGA
+\end_layout
+
+\begin_layout Standard
+Après avoir réalisé le compilateur et l'interpréteur nous avons créé un
+ processeur (avec pipeline 5 étage) en utilisant le langage VHDL, capable
+ d'exécuter (la plupart) des instructions générées pas notre compilateur.
+ Comme nous avons ajouté plusieurs instructions assembleur par rapport au
+ jeu de base, il nous aurait fallut créer un cross assembleur pour transformer
+ notre code assembleur orienté mémoire en un code assembleur orienté registre
+ pour pouvoir exécuter des programmes compilés par notre compilateur.
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status collapsed
+
+\begin_layout Plain Layout
+
+
+\backslash
+setcounter{section}{0}
+\end_layout
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Section
+Unité Arithmétique et Logique
+\end_layout
+
+\begin_layout Standard
+L'Unité Arithmétique et Logique (UAL), prend en entrée des bus de 8 bits
+ et donne en sortie le résultat d'une opération arithmétique de ces entrées.
+ L'opération effectuée est choisie par 3 bits de contrôles.
+ Nous avons implémenté l'addition, la soustraction et la multiplication.
+ En plus du résultat l'UAL possède des flags pour la retenue de l'addition
+ (C), un résultat nul (Z), un résultat négatif (N) et un overflow (V).
+\end_layout
+
+\begin_layout Standard
+L'UAL est asynchrone, on utilise une logique combinatoire pour décider des
+ différents flags.
+\end_layout
+
+\begin_layout Standard
+Exemple de test de l'UAL :
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Graphics
+	filename chronogrammes/ual.JPG
+	width 17cm
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On commence par faire une addition (ctr_alu=1), on a en entrée a=0 et b=0,
+ la sortie vaut s=0 et on a le flage Z, ensuite a passe à 5 et on a bien
+ s qui passe également à 5, quand b passe à 10, s vaut alors 15.
+\end_layout
+
+\begin_layout Standard
+On fait ensuite une soustraction (ctrl_alu=2), s passe correctement à -5
+ et on a bien le flag N qui apparait, lorsqu'on repasse en addition il revient
+ à 0.
+\end_layout
+
+\begin_layout Standard
+Lorsque a passe à 127 et que l'on est en addition avec b=10, s devrait valoir
+ 137, mais comme le résultat est sur 8 bits il vaut -119, on a bien les
+ flags C, N et O qui se lèvent.
+\end_layout
+
+\begin_layout Standard
+Finalement on fait une multiplication (ctrl_alu=3), avec a=2 et b=4, on
+ a bien s=8 et aucun flag levé.
+ Lorsque b passe à 175 on a un overflow et le résultat n'est pas correct
+ (car encore une fois on est sur 8 bits).
+\end_layout
+
+\begin_layout Section
+Banc de registres
+\end_layout
+
+\begin_layout Standard
+Le banc de registre permet de manipuler 16 registres de 8 bits.
+ Il permet de lire 2 registres en même temps, mais l'écriture ne se fait
+ que sur un seul.
+ On a en entrée les adresses des deux registres à lire, l'adresse du registre
+ à écrire, la donnée à écrire, le bit écriture (actif haut), le bit reset
+ (actif bas) et l'horloge.
+ Les sorties sont les valeurs des registres lus.
+\end_layout
+
+\begin_layout Standard
+La lecture des registres est asynchrone mais l'écriture est synchrone.
+\end_layout
+
+\begin_layout Standard
+Pour éviter les aléas de données, nous avons mis en place un bypass d ->
+ q : lorsque l'on souhaite lire et écrire sur le même registre, on recopie
+ directement l'entrée DATA sur la sortie, on évite ainsi d'avoir en sortie
+ l'ancienne valeur du registre.
+\end_layout
+
+\begin_layout Standard
+Exemple de test du banc de registres :
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Graphics
+	filename chronogrammes/registres.JPG
+	width 17cm
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Tant que reset est actif (rst=0), il ne se passe rien, les registres et
+ les sorties sont à 0.
+\end_layout
+
+\begin_layout Standard
+Lorsque le reset devient inactif, comme on a write à 1 que l'adresse a est
+ 9 et l'adresse w également on a data (170) sur la sortie a (bypass), le
+ registre 9 est lui bien écrit.
+ On a un deuxième cas de bypass lorsque adra=3 et adrw=3.
+\end_layout
+
+\begin_layout Section
+Banc de mémoire
+\end_layout
+
+\begin_layout Subsection
+Mémoire des données
+\end_layout
+
+\begin_layout Standard
+Cette mémoire contient 256 emplacements de 8 bits que l'on peut lire ou
+ écrire.
+ En entrée on a l'adresse, la valeur à écrire, le bit de choix lecture /
+ écriture (1 pour lecture, 0 pour écriture), le reset, l'horloge, la seule
+ sortie et la valeur lue.
+\end_layout
+
+\begin_layout Standard
+Cette mémoire et totalement synchrone.
+\end_layout
+
+\begin_layout Standard
+Exemple de test de la mémoire des données :
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Graphics
+	filename chronogrammes/donnees.JPG
+	width 17cm
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Les données sont indéterminées jusqu'au premier front montant d'horloge,
+ comme reset est à 0, elles passent à 0.
+\end_layout
+
+\begin_layout Standard
+Donnees(0) est forcé à 10 après 8ns.
+ Comme ensuite on a adr=0 et rw=1 (lecture), on voit que donnees(0) est
+ effectivement recopié sur le port de sortie (pout).
+\end_layout
+
+\begin_layout Standard
+Ensuite adr passe à 1, on a 12 sur le port d'entrée (pin) et rw=0, sur le
+ front montant d'horloge suivant 12 est bien écrit dans donnees(1).
+ Lorsque rw repasse à 1 on a 12 sur pout.
+\end_layout
+
+\begin_layout Subsection
+Mémoire des instructions
+\end_layout
+
+\begin_layout Standard
+La mémoire des instructions contient 256 instructions sur 32 bits.
+ Elle n'est accessible qu'en lecture (comme une ROM) et n'a pas de reset.
+ On a donc en entrée l'adresse et l'horloge et en sortie l'instruction.
+\end_layout
+
+\begin_layout Standard
+Elle est synchrone, mais pour la suite cela n'a pas d'importance car même
+ si elle était asynchrone comme le pointeur d'instruction n'est modifié
+ que sur front montant d'horloge cela revient au même.
+\end_layout
+
+\begin_layout Section
+Chemin des données
+\end_layout
+
+\begin_layout Standard
+Une fois les différents éléments conçus nous les avons assemblés et mis
+ en place le pipeline pour créer notre processeur, et lui permettre de réaliser
+ les différentes instructions.
+\begin_inset Newline newline
+\end_inset
+
+ Le pipeline est constitué comme ceci :
+\end_layout
+
+\begin_layout Standard
+1er étage : mémoire des instructions
+\end_layout
+
+\begin_layout Standard
+2ème étage : banc de registres (lecture)
+\end_layout
+
+\begin_layout Standard
+3ème étage : unité arithmétique et logique
+\end_layout
+
+\begin_layout Standard
+4ème étage : mémoire des données
+\end_layout
+
+\begin_layout Standard
+5ème étage : banc de registre (écriture)
+\begin_inset Newline newline
+\end_inset
+
+ L'instruction en sortie de la mémoire est un bus de 32 bits, on le sépare
+ en 4 bus de 8 bits pour l'envoyer aux différents éléments.
+\end_layout
+
+\begin_layout Standard
+bits 31 à 24 : code opération
+\end_layout
+
+\begin_layout Standard
+bits 23 à 16 : opérande A
+\end_layout
+
+\begin_layout Standard
+bits 15 à 8 : opérande B
+\end_layout
+
+\begin_layout Standard
+bits 7 à 0 : opérande C
+\begin_inset Newline newline
+\end_inset
+
+ Les différentes entrées / sortie possibles sont mises en place par des
+ multiplexeurs controlés par le code opération, les bits de choix lecture
+ / écriture sont eux le résultat d'une logique combinatoire du code opération.
+\end_layout
+
+\begin_layout Standard
+À ce stade notre processeur peut réaliser les instructions AFC, COP, ADD,
+ SOU, MUL, LOAD et STORE.
+\end_layout
+
+\begin_layout Standard
+Vous trouverez des exemples de chronogrammes dans la partie suivante.
+\end_layout
+
+\begin_layout Section
+Gestion des aléas
+\end_layout
+
+\begin_layout Standard
+Il existe des cas d'aléas de données dans notre processeur.
+ Ils apparaissent lorsque l'on modifie la valeur d'un registre puis que
+ l'on stocke cette valeur (dans un registre ou dans la mémoire des données).
+ En effet avec le pipeline on va commencer à récupérer la valeur du registre
+ à conserver avant qu'elle n'ait été modifiée.
+ Pour y remédier il faut insérer des NOP pour retarder la recopie le temps
+ que le changement de valeur s'effectue.
+\end_layout
+
+\begin_layout Standard
+On détecte les aléas au premier étage du pipeline, si l'instruction qui
+ arrive est une copie et que plus loin on a une affectation alors on est
+ en présence d'un aléa.
+ Dans ce cas on arrête d'incrémenter le pointeur d'instruction et tant que
+ l'aléa est présent on insère des NOP.
+ 
+\end_layout
+
+\begin_layout Standard
+Exemple de test de gestion d'aléa AFC - COP :
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Graphics
+	filename chronogrammes/proc_alea_reg.JPG
+	width 17cm
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Dans cet exemple on veut réaliser les instructions suivantes : AFC 1 12
+ et COP 2 1.
+ Il y a donc un aléa de données car on veut affecter une valeur au registre
+ 1 et ensuite copier la valeur du registre 1 dans le registre 2.
+\end_layout
+
+\begin_layout Standard
+Sur le premier front montant d'horloge avec rst=1, on charge la première
+ instruction (op1 prend les 8 premiers bits de instr), ip est incrémenté,
+ instr prend l'instruction suivante.
+ On va alors détecter l'aléa, et au front suivant on insère un NOP (code
+ instruction x00), et on continue à en insérer tant qu'on a pas fini d'exécuter
+ la première instruction.
+ Ensuite on reprend normalement.
+ On a bien au final le registre 1 qui vaut 12 et le registre 2 également.
+\begin_inset Newline linebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Exemple de test de gestion d'aléa AFC - STORE :
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Graphics
+	filename chronogrammes/donnees.JPG
+	width 17cm
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Dans cet exemple on va réaliser les instructions AFC 1 12, AFC 3 1 et STORE
+ 0 1, il y a là encore un aléa de données car on veut affecter une valeur
+ au registre 1 et ensuite copier la valeur du registre 1 dans la mémoire
+ à l'adresse 0.
+\end_layout
+
+\begin_layout Standard
+De la même façon que précédemment on charge sans problème les deux premières
+ instructions, mais quand instr prend l'instruction STORE on va détecter
+ l'aléa et insérer des NOP.
+\end_layout
+
+\begin_layout Section
+Saut et saut conditionnel
+\end_layout
+
+\begin_layout Standard
+Nous n'avons pas eu le temps d'implémenter ces instructions sur le processeur,
+ mais nous avons commencé à y réfléchir.
+\end_layout
+
+\begin_layout Standard
+Les sauts vont modifier le pointeur d'instructions, mais pour le saut conditionn
+el il faut avant passer par le banc de registre pour avoir la condition.
+ On va avoir un aléa de contrôle car on aura commencé à charger une instruction
+ qu'il ne faut pas exécuter.
+ Pour gérer cet aléa il faut soit lorsqu'on rencontre un JMF ne pas incrémenter
+ le pointeur d'instruction (mais cela fait perdre des cycles d'horloge si
+ la condition n'est pas vérifiée), soit attendre d'évaluer la condition
+ et si le saut doit être effectué remplacer les instructions qui ne doivent
+ pas être exécutées par des NOP.
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Part*
+Conclusion
+\end_layout
+
+\begin_layout Standard
+Bien que nous n'ayons pas pu assembler les deux parties du projet, nous
+ les avons tout de même menées à bien.
+ Nous avons un compilateur et l'interpréteur associé totalement opérationnels
+ et assez complets ainsi qu'un processeur qui ne demande plus qu'à être
+ implémenté.
+\end_layout
+
+\begin_layout Standard
+Ce projet aura été très intéressant car il nous aura permis d'approfondir
+ les cours d'Automates et Langages et d'Architecture Matérielle, tout en
+ enrichissant nos connaissances en informatique (fonctionnement d'un compilateur
+, d'un interpréteur, de la pile système, de pipelines...).
+ 
+\begin_inset Newpage pagebreak
+\end_inset
+
+Annexe : Rapport de synthèse
+\end_layout
+
+\begin_layout Standard
+Voici une partie du 
+\begin_inset Quotes fld
+\end_inset
+
+design summary
+\begin_inset Quotes frd
+\end_inset
+
+ généré par xilinx après synthèse de notre processeur.
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+Advanced HDL Synthesis Report:
+\begin_inset Newline newline
+\end_inset
+
+---------------------------
+\end_layout
+
+\begin_layout Standard
+Macro Statistics
+\end_layout
+
+\begin_layout Standard
+# ROMs : 1
+\end_layout
+
+\begin_layout Standard
+256x32-bit ROM : 1
+\end_layout
+
+\begin_layout Standard
+# Multipliers : 1
+\end_layout
+
+\begin_layout Standard
+8x8-bit registered multiplier : 1
+\end_layout
+
+\begin_layout Standard
+# Adders/Subtractors : 1
+\end_layout
+
+\begin_layout Standard
+16-bit addsub : 1
+\end_layout
+
+\begin_layout Standard
+# Counters : 1
+\end_layout
+
+\begin_layout Standard
+8-bit up counter : 1
+\end_layout
+
+\begin_layout Standard
+# Registers : 2289
+\end_layout
+
+\begin_layout Standard
+Flip-Flops : 2289
+\end_layout
+
+\begin_layout Standard
+# Comparators : 5
+\end_layout
+
+\begin_layout Standard
+4-bit comparator equal : 2
+\end_layout
+
+\begin_layout Standard
+8-bit comparator equal : 2
+\end_layout
+
+\begin_layout Standard
+8-bit comparator greater : 1
+\end_layout
+
+\begin_layout Standard
+# Multiplexers : 29
+\end_layout
+
+\begin_layout Standard
+1-bit 16-to-1 multiplexer : 16
+\end_layout
+
+\begin_layout Standard
+16-bit 2-to-1 multiplexer : 6
+\end_layout
+
+\begin_layout Standard
+8-bit 2-to-1 multiplexer : 6
+\end_layout
+
+\begin_layout Standard
+8-bit 256-to-1 multiplexer : 1
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+Design Summary:
+\begin_inset Newline newline
+\end_inset
+
+---------------------------
+\end_layout
+
+\begin_layout Standard
+# BELS : 136
+\end_layout
+
+\begin_layout Standard
+# GND : 1
+\end_layout
+
+\begin_layout Standard
+# INV : 2
+\end_layout
+
+\begin_layout Standard
+# LUT1 : 7
+\end_layout
+
+\begin_layout Standard
+# LUT2 : 17
+\end_layout
+
+\begin_layout Standard
+# LUT3 : 31
+\end_layout
+
+\begin_layout Standard
+# LUT4 : 4
+\end_layout
+
+\begin_layout Standard
+# LUT5 : 20
+\end_layout
+
+\begin_layout Standard
+# LUT6 : 23
+\end_layout
+
+\begin_layout Standard
+# MUXCY : 14
+\end_layout
+
+\begin_layout Standard
+# VCC : 1
+\end_layout
+
+\begin_layout Standard
+# XORCY : 16
+\end_layout
+
+\begin_layout Standard
+# FlipFlops/Latches : 80
+\end_layout
+
+\begin_layout Standard
+# FD : 1
+\end_layout
+
+\begin_layout Standard
+# FDR : 63
+\end_layout
+
+\begin_layout Standard
+# FDRE : 16
+\end_layout
+
+\begin_layout Standard
+# Clock Buffers : 1
+\end_layout
+
+\begin_layout Standard
+# BUFGP : 1
+\end_layout
+
+\begin_layout Standard
+# IO Buffers : 9
+\end_layout
+
+\begin_layout Standard
+# IBUF : 1
+\end_layout
+
+\begin_layout Standard
+# OBUF : 8
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+Device utilization summary:
+\begin_inset Newline newline
+\end_inset
+
+---------------------------
+\end_layout
+
+\begin_layout Standard
+Selected Device : 6slx16csg324-3
+\end_layout
+
+\begin_layout Standard
+Slice Logic Utilization:
+\end_layout
+
+\begin_layout Standard
+Number of Slice Registers: 80 out of 18224 0%
+\end_layout
+
+\begin_layout Standard
+Number of Slice LUTs: 104 out of 9112 1%
+\end_layout
+
+\begin_layout Standard
+Number used as Logic: 104 out of 9112 1%
+\end_layout
+
+\begin_layout Standard
+Slice Logic Distribution:
+\end_layout
+
+\begin_layout Standard
+Number of LUT Flip Flop pairs used: 137
+\end_layout
+
+\begin_layout Standard
+Number with an unused Flip Flop: 57 out of 137 41%
+\end_layout
+
+\begin_layout Standard
+Number with an unused LUT: 33 out of 137 24%
+\end_layout
+
+\begin_layout Standard
+Number of fully used LUT-FF pairs: 47 out of 137 34%
+\end_layout
+
+\begin_layout Standard
+Number of unique control sets: 5
+\end_layout
+
+\begin_layout Standard
+IO Utilization:
+\end_layout
+
+\begin_layout Standard
+Number of IOs: 10
+\end_layout
+
+\begin_layout Standard
+Number of bonded IOBs: 10 out of 232 4%
+\end_layout
+
+\begin_layout Standard
+Specific Feature Utilization:
+\end_layout
+
+\begin_layout Standard
+Number of BUFG/BUFGCTRLs: 1 out of 16 6%
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+Timing Summary:
+\begin_inset Newline newline
+\end_inset
+
+---------------------------
+\end_layout
+
+\begin_layout Standard
+Speed Grade: -3
+\end_layout
+
+\begin_layout Standard
+Minimum period: 3.854ns (Maximum Frequency: 259.491MHz)
+\end_layout
+
+\begin_layout Standard
+Minimum input arrival time before clock: 3.340ns
+\end_layout
+
+\begin_layout Standard
+Maximum output required time after clock: 5.640ns
+\end_layout
+
+\begin_layout Standard
+Maximum combinational path delay: No path found
+\end_layout
+
+\end_body
+\end_document
