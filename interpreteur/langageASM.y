@@ -1,6 +1,9 @@
 %{
 #include <stdio.h>
 #include "assembleur.h"
+
+void yyerror(const char *s);
+int yylex();
 %}
 
 %token tAdd tMul tSou tDiv tCop tAfc tJmp tJmf tInf tSup tEqu tPri tEntier tIcp tCpi tOr tAnd tCall tRet tPush tPop tEsp tEbp tMov tErt

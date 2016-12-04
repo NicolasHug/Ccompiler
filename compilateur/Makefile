@@ -1,4 +1,3 @@
-default: all
 all: compilo
 
 compilo : langageC.lex langageC.y tableDesSymboles.o exprArithmetiques.o fonctions.o utilitaires.o compilateur.o

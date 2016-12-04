@@ -3,7 +3,8 @@
 #include "compilateur.h"
 #include "exprArithmetiques.h"
 
-void yyerror(char *s);
+void yyerror(const char *s);
+int yylex();
 char messageErreur[100];
 int erreurExiste = 0;
 extern int yylineno;
@@ -191,7 +192,7 @@ Pargs : tNom {pushParam($1); $$=1;};
 
 %%
 
-void yyerror(char *s) {
+void yyerror(const char *s) {
   fprintf(stderr, "ERREUR : %s (line %d)\n", s, yylineno); 
 }
 
