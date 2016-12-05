@@ -1,3 +1,8 @@
+/* Demo file: compute the sum of the elements of an array with a recursive
+ * function.
+ */
+
+
 // Initialize an array of int.
 void init_array (int * array, int size) {
   int i;
@@ -11,21 +16,20 @@ void init_array (int * array, int size) {
  * Return the sum of the elements in array.
  */
 int sum (int * array , int size, int index) {
-  int nouvelindex = index + 1;
+  int new_index = index + 1;
   if (index == size) {
     return 0;
   } else {
     // Recusive call!
-    return array[index] + sum(array, size, nouvelindex);
+    return array[index] + sum(array, size, new_index);
   }
 }
 
 int main () {
   int size = 10;
   int array[10];
-  int first_index = 0;
 
   init_array(array, size);
-  printf(sum(array, size, first_index));
+  printf(sum(array, size, 0));
   return 0;
 }
